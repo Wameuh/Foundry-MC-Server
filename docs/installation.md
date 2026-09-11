@@ -76,9 +76,11 @@ URL WebSocket du pont : wss://mcp.example.com/foundry-mcp/bridge
 Secret du pont          : valeur FOUNDRY_BRIDGE_SECRET du fichier .env
 ```
 
-Recharger le monde après l'enregistrement. Un navigateur connecté avec un
-utilisateur GM doit rester ouvert : c'est lui qui exécute les API Foundry,
-D&D5e et Plutonium.
+Après avoir enregistré les paramètres, le pont se connecte ou se reconnecte
+automatiquement : aucun rechargement du monde n'est nécessaire. Un navigateur
+connecté avec un utilisateur GM doit rester ouvert : c'est lui qui exécute les
+API Foundry, D&D5e et Plutonium. Un rechargement reste nécessaire uniquement
+après l'installation ou la mise à jour du module lui-même.
 
 Vérifier alors l'état public du serveur :
 

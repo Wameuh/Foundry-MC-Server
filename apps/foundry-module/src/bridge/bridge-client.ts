@@ -36,6 +36,13 @@ export class BridgeClient {
     this.socket = undefined;
   }
 
+  /** Restart the bridge using the current module settings. */
+  restart(): void {
+    this.stop();
+    this.backoff.reset();
+    this.start();
+  }
+
   private connect(): void {
     if (this.stopped || !game.user?.isGM) return;
     const settings = readSettings();
@@ -48,7 +55,7 @@ export class BridgeClient {
     this.socket = socket;
     socket.addEventListener("open", () => this.debug(settings, "WebSocket connected; awaiting challenge."));
     socket.addEventListener("message", (event) => void this.onMessage(event, settings));
-    socket.addEventListener("close", () => this.onClose(settings));
+    socket.addEventListener("close", () => this.onClose(settings, socket));
     socket.addEventListener("error", () => this.debug(settings, "WebSocket error."));
   }
 
@@ -96,7 +103,9 @@ export class BridgeClient {
     this.send({ type: "auth.proof", nonce, worldId, userId, hmac });
   }
 
-  private onClose(settings: BridgeSettings): void {
+  private onClose(settings: BridgeSettings, socket: WebSocket): void {
+    // Ignore a close event from a socket replaced by restart().
+    if (this.socket !== socket) return;
     this.heartbeat.stop();
     this.socket = undefined;
     if (this.stopped) return;

@@ -1,8 +1,8 @@
 {
   "FOUNDRY_MCP.Settings.BridgeUrl.Name": "Bridge WebSocket URL",
-  "FOUNDRY_MCP.Settings.BridgeUrl.Hint": "Secure WebSocket endpoint exposed by the MCP server.",
+  "FOUNDRY_MCP.Settings.BridgeUrl.Hint": "WebSocket endpoint exposed by the MCP server. Saving this setting reconnects immediately.",
   "FOUNDRY_MCP.Settings.BridgeSecret.Name": "Bridge secret",
-  "FOUNDRY_MCP.Settings.BridgeSecret.Hint": "Shared secret used for challenge authentication. Visible to GMs only.",
+  "FOUNDRY_MCP.Settings.BridgeSecret.Hint": "Shared secret used for challenge authentication. Saving this setting reconnects immediately. Visible to GMs only.",
   "FOUNDRY_MCP.Settings.Notifications.Name": "Show notifications",
   "FOUNDRY_MCP.Settings.Notifications.Hint": "Show a Foundry notification after mutating operations.",
   "FOUNDRY_MCP.Settings.Diagnostics.Name": "Diagnostic logging",
