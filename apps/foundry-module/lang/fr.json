@@ -1,0 +1,10 @@
+{
+  "FOUNDRY_MCP.Settings.BridgeUrl.Name": "URL WebSocket du pont",
+  "FOUNDRY_MCP.Settings.BridgeUrl.Hint": "Point d’accès WebSocket sécurisé exposé par le serveur MCP.",
+  "FOUNDRY_MCP.Settings.BridgeSecret.Name": "Secret du pont",
+  "FOUNDRY_MCP.Settings.BridgeSecret.Hint": "Secret partagé utilisé pour l’authentification. Réservé aux MJ.",
+  "FOUNDRY_MCP.Settings.Notifications.Name": "Afficher les notifications",
+  "FOUNDRY_MCP.Settings.Notifications.Hint": "Afficher une notification après les opérations de modification.",
+  "FOUNDRY_MCP.Settings.Diagnostics.Name": "Journal de diagnostic",
+  "FOUNDRY_MCP.Settings.Diagnostics.Hint": "Journaliser la connexion sans inclure les secrets ni les données manipulées."
+}

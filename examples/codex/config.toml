@@ -1,0 +1,4 @@
+[mcp_servers.foundry]
+url = "https://mcp.example.com/mcp"
+bearer_token_env = "MCP_BEARER_TOKEN"
+request_timeout_seconds = 180

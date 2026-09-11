@@ -1,0 +1,19 @@
+[Unit]
+Description=Foundry VTT MCP bridge server
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/foundry-mcp
+EnvironmentFile=/opt/foundry-mcp/.env
+ExecStart=/usr/bin/node /opt/foundry-mcp/apps/mcp-server/dist/index.js
+Restart=on-failure
+RestartSec=5
+User=foundry-mcp
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/foundry-mcp/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,32 @@
+{
+  "name": "foundry-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @foundry-mcp/protocol && npm run build -w @foundry-mcp/server && npm run build -w @foundry-mcp/foundry-module",
+    "typecheck": "npm run build -w @foundry-mcp/protocol && npm run typecheck -w @foundry-mcp/server && npm run typecheck -w @foundry-mcp/foundry-module",
+    "check": "npm run typecheck && npm run lint",
+    "lint": "eslint .",
+    "package:module": "node scripts/package-foundry-module.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@types/node": "^22.18.0",
+    "eslint": "^9.35.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vitest": "^5.0.0"
+  }
+}
