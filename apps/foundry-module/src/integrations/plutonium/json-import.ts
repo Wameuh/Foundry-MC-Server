@@ -1,12 +1,14 @@
 import { requireGm, requireRecord, requireString } from "../../operations/errors";
 import { assertSafeObject } from "../../operations/safe-data";
-import { getPlutoniumCapabilities } from "./capability-probe";
+import { getProbedPlutoniumImporter, refreshPlutoniumCapabilities } from "./capability-probe";
 import { getPlutoniumApi } from "./detect";
 import { PlutoniumError, plutoniumUnavailable } from "./errors";
 import { captureImportEvents } from "./import-hooks";
 import { createImportOptions } from "./import-options";
 import { isKnownImporter } from "./importer-registry";
 import { normalizePlutoniumResult } from "./normalize-result";
+
+const PLUTONIUM_PROVIDER_TIMEOUT_MS = 110_000;
 
 export async function importPlutoniumEntries(payload: unknown, operationId: string) {
   requireGm();
@@ -16,7 +18,7 @@ export async function importPlutoniumEntries(payload: unknown, operationId: stri
   if (!Array.isArray(input.entries) || input.entries.length === 0 || input.entries.length > 20) {
     throw new PlutoniumError("INVALID_REQUEST", "entries must contain between 1 and 20 entries.");
   }
-  const capabilities = getPlutoniumCapabilities();
+  const capabilities = await refreshPlutoniumCapabilities();
   const api = getPlutoniumApi();
   if (!capabilities.importJson || !api) {
     throw plutoniumUnavailable(capabilities);
@@ -39,10 +41,10 @@ export async function importPlutoniumEntries(payload: unknown, operationId: stri
       expectedNames.add(requireString(data.name, `entries[${index}].data.name`));
       requireString(data.source, `entries[${index}].data.source`);
       if (data.__prop !== prop) throw new PlutoniumError("INVALID_REQUEST", `entries[${index}].data.__prop must equal prop.`);
-      const importer = await api.importer.pGetImporter({ prop });
+      const importer = getProbedPlutoniumImporter(api, prop) ?? await api.importer.pGetImporter({ prop });
       if (!importer?.pImportEntry) throw new PlutoniumError("PLUTONIUM_IMPORTER_UNAVAILABLE", `The ${prop} importer is unavailable.`);
       try {
-        summaries.push(await withTimeout(importer.pImportEntry(data, options), 120_000));
+        summaries.push(await withTimeout(importer.pImportEntry(data, options), PLUTONIUM_PROVIDER_TIMEOUT_MS));
       } catch (error) {
         if (error instanceof PlutoniumError) throw error;
         throw new PlutoniumError("PLUTONIUM_IMPORT_FAILED", `Plutonium failed to import ${String(data.name)}.`, safeError(error));

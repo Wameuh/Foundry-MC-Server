@@ -1,4 +1,4 @@
-import { getPlutoniumModule, SUPPORTED_PLUTONIUM_VERSION } from "./detect";
+import { getPlutoniumModule, SUPPORTED_PLUTONIUM_VERSIONS } from "./detect";
 
 export function getPlutoniumCompatibility(): { compatible: boolean; version?: string; reason?: string } {
   const module = getPlutoniumModule();
@@ -8,11 +8,13 @@ export function getPlutoniumCompatibility(): { compatible: boolean; version?: st
     ...(module.version ? { version: module.version } : {}),
     reason: "Plutonium is inactive.",
   };
-  if (module.version !== SUPPORTED_PLUTONIUM_VERSION) {
+  if (!module.version || !SUPPORTED_PLUTONIUM_VERSIONS.includes(module.version as typeof SUPPORTED_PLUTONIUM_VERSIONS[number])) {
     return {
       compatible: false,
       ...(module.version ? { version: module.version } : {}),
-      reason: `Plutonium ${String(module.version)} is not in the tested compatibility matrix.`,
+      reason: module.version
+        ? `Plutonium ${module.version} is unsupported. Certified versions: ${SUPPORTED_PLUTONIUM_VERSIONS.join(", ")}.`
+        : `Plutonium version is unavailable. Certified versions: ${SUPPORTED_PLUTONIUM_VERSIONS.join(", ")}.`,
     };
   }
   return { compatible: true, ...(module.version ? { version: module.version } : {}) };

@@ -90,6 +90,7 @@ FOUNDRY_HEADLESS_BRIDGE_URL=ws://127.0.0.1:3210/foundry-mcp/bridge
 FOUNDRY_HEADLESS_CHROMIUM_PATH=/usr/bin/chromium
 FOUNDRY_HEADLESS_PROFILE_PATH=./data/chromium-profile
 FOUNDRY_HEADLESS_READY_TIMEOUT_MS=300000
+FOUNDRY_HEADLESS_BRIDGE_GRACE_MS=180000
 ```
 
 Démarrer ensuite le serveur :
@@ -108,6 +109,11 @@ profil client, puis attend l'enregistrement du WebSocket.
 Le délai de chargement du monde est de cinq minutes par défaut, car D&D5e et
 Plutonium peuvent être lents sur une petite machine. Il est réglable avec
 `FOUNDRY_HEADLESS_READY_TIMEOUT_MS`.
+
+Une fois le monde déclaré prêt, le module dispose de trois minutes pour ouvrir
+le pont. Ce second délai, réglable avec
+`FOUNDRY_HEADLESS_BRIDGE_GRACE_MS`, évite une reconnexion inutile lorsque
+Plutonium termine encore ses tâches asynchrones du hook `ready`.
 
 Après une expiration de session, un redémarrage de Foundry ou une déconnexion
 du pont, le navigateur est fermé puis relancé avec un délai fixe configurable.

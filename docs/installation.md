@@ -123,18 +123,18 @@ publiée ou pour tester une modification locale :
 ```sh
 npm ci
 npm run package:module
-unzip -l artifacts/foundry-mcp-bridge-0.2.1.zip
+unzip -l artifacts/foundry-mcp-bridge-0.2.3.zip
 ```
 
 Extraire ensuite l'archive dans le répertoire de données Foundry :
 
 ```sh
 mkdir -p /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
-unzip artifacts/foundry-mcp-bridge-0.2.1.zip \
+unzip artifacts/foundry-mcp-bridge-0.2.3.zip \
   -d /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
 ```
 
 Redémarrer Foundry, puis activer le module dans le monde.
 
 Plutonium reste facultatif. La matrice certifiée est Foundry `14.367`, D&D5e
-`5.3.3` et Plutonium `2.18.1.v14`.
+`5.3.3` et Plutonium `2.18.1.v14` ou `2.18.3.v14`.

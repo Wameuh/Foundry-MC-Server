@@ -12,7 +12,7 @@ import { importCompendium, searchCompendiums } from "../operations/compendium-im
 import { deleteDocuments } from "../operations/delete-documents";
 import { prepareDelete } from "../operations/prepare-delete";
 import { buildCharacter } from "../dnd5e/actor-builder";
-import { getPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
+import { refreshPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
 import { importPlutoniumReference } from "../integrations/plutonium/reference-import";
 import { importPlutoniumEntries } from "../integrations/plutonium/json-import";
 import { OperationError } from "../operations/errors";
@@ -34,7 +34,9 @@ const handlers: Record<string, Handler> = {
   "foundry.deleteDocuments": deleteDocuments,
   "foundry.prepareDelete": (payload) => prepareDelete(payload),
   "dnd5e.buildCharacter": buildCharacter,
-  "plutonium.getCapabilities": () => getPlutoniumCapabilities(),
+  // Plutonium publishes module.api during its own lifecycle. Re-probe here so
+  // a bridge that connected before Plutonium finished initializing can recover.
+  "plutonium.getCapabilities": () => refreshPlutoniumCapabilities(),
   "plutonium.importReference": importPlutoniumReference,
   "plutonium.importEntries": importPlutoniumEntries,
 };

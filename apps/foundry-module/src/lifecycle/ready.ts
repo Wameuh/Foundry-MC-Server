@@ -7,14 +7,18 @@ import { offerAssistantAccountProvisioning } from "../provisioning/assistant-acc
 let bridgeClient: BridgeClient | undefined;
 let unsubscribeFromBridgeSettings: (() => void) | undefined;
 
-export async function onReady(): Promise<void> {
+export function onReady(): void {
   if (!game.user?.isGM) return;
   contextTracker.start();
-  // Let every module finish its synchronous ready hook before probing optional APIs.
-  await new Promise<void>((resolve) => setTimeout(resolve, 0));
-  await refreshPlutoniumCapabilities();
+
+  // Connect synchronously from our ready hook. Plutonium can perform lengthy
+  // asynchronous initialization, and capability discovery is recoverable.
   bridgeClient = new BridgeClient();
   bridgeClient.start();
+
+  // Capability discovery can instantiate several Plutonium importers. Keep it
+  // off the critical bridge connection path; MCP calls re-probe before use.
+  void refreshPlutoniumCapabilities();
 
   // Client-scoped settings use their registered onChange callback. This is
   // also triggered by the automated browser when it configures its profile.

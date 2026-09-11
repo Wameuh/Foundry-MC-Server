@@ -56,18 +56,21 @@ describe("Foundry dispatcher feature journey", () => {
 
   it("imports a supported entry through the Plutonium adapter", async () => {
     const fake = createFakePlutonium();
+    let importerProbes = 0;
+    const originalGetImporter = fake.api.importer.pGetImporter;
+    fake.api.importer.pGetImporter = async (input) => {
+      importerProbes += 1;
+      return await originalGetImporter(input);
+    };
     installFakeFoundry([]);
     (globalThis as Record<string, unknown>).game = {
       user: { isGM: true, id: "gm", name: "GM" },
-      modules: new Map([["plutonium", { active: true, version: "2.18.1.v14", api: fake.api }]]),
+      modules: new Map([["plutonium", { active: true, version: "2.18.3.v14", api: fake.api }]]),
       packs: new Map(),
       settings: { get: () => false },
     };
     (globalThis as Record<string, unknown>).ui = { notifications: { info: () => undefined, warn: () => undefined, error: () => undefined } };
     const { dispatchRequest } = await import("../../apps/foundry-module/src/bridge/dispatcher.js");
-    const { refreshPlutoniumCapabilities } = await import("../../apps/foundry-module/src/integrations/plutonium/capability-probe.js");
-    await refreshPlutoniumCapabilities();
-
     const result = await dispatchRequest({
       requestId: "plutonium-1", operationId: "op-plutonium", operation: BridgeOperation.PLUTONIUM_IMPORT_ENTRIES,
       payload: { entries: [{ prop: "spell", data: { name: "Fireball", source: "PHB", __prop: "spell" } }], destination: { type: "world" } },
@@ -75,6 +78,7 @@ describe("Foundry dispatcher feature journey", () => {
     });
     expect(result.ok).toBe(true);
     expect(fake.imported).toEqual([{ name: "Fireball", source: "PHB", __prop: "spell" }]);
+    expect(importerProbes).toBe(14);
     if (result.ok) expect(result.result).toMatchObject({ provider: "plutonium", status: "completed" });
   });
 });

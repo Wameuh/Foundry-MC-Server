@@ -1,6 +1,10 @@
+import { SUPPORTED_PLUTONIUM_VERSIONS } from "@foundry-mcp/protocol/constants";
 import type { PlutoniumApi } from "./types";
 
-export const SUPPORTED_PLUTONIUM_VERSION = "2.18.1.v14";
+export { SUPPORTED_PLUTONIUM_VERSIONS };
+
+/** Kept for consumers that used the original single-version export. */
+export const SUPPORTED_PLUTONIUM_VERSION = SUPPORTED_PLUTONIUM_VERSIONS[0];
 
 export function getPlutoniumModule() {
   return game.modules?.get("plutonium");

@@ -1,12 +1,14 @@
 import { emptyReceipt, toDocumentReference } from "../../operations/document-reference";
 import { requireGm, requireRecord, requireString } from "../../operations/errors";
-import { getPlutoniumCapabilities } from "./capability-probe";
+import { refreshPlutoniumCapabilities } from "./capability-probe";
 import { getPlutoniumApi } from "./detect";
 import { PlutoniumError, plutoniumUnavailable } from "./errors";
 
+const PLUTONIUM_PROVIDER_TIMEOUT_MS = 110_000;
+
 export async function importPlutoniumReference(payload: unknown, operationId: string) {
   requireGm();
-  const capabilities = getPlutoniumCapabilities();
+  const capabilities = await refreshPlutoniumCapabilities();
   if (!capabilities.importReference) throw plutoniumUnavailable(capabilities);
   const input = requireRecord(payload);
   const type = requireString(input.type, "type");
@@ -24,7 +26,7 @@ export async function importPlutoniumReference(payload: unknown, operationId: st
   } catch (error) {
     throw new PlutoniumError("PLUTONIUM_REFERENCE_UNSUPPORTED", "Plutonium could not build this reference.", safeError(error));
   }
-  const document = await withTimeout(fromUuid(uuid), 120_000);
+  const document = await withTimeout(fromUuid(uuid), PLUTONIUM_PROVIDER_TIMEOUT_MS);
   if (!document) throw new PlutoniumError("PLUTONIUM_SOURCE_NOT_FOUND", `${name}|${source} could not be resolved by Plutonium.`);
   return {
     ...emptyReceipt(operationId, "plutonium"),

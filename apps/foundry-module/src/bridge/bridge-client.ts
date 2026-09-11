@@ -55,7 +55,7 @@ export class BridgeClient {
     this.socket = socket;
     socket.addEventListener("open", () => this.debug(settings, "WebSocket connected; awaiting challenge."));
     socket.addEventListener("message", (event) => void this.onMessage(event, settings));
-    socket.addEventListener("close", () => this.onClose(settings, socket));
+    socket.addEventListener("close", (event) => this.onClose(settings, socket, event));
     socket.addEventListener("error", () => this.debug(settings, "WebSocket error."));
   }
 
@@ -103,14 +103,15 @@ export class BridgeClient {
     this.send({ type: "auth.proof", nonce, worldId, userId, hmac });
   }
 
-  private onClose(settings: BridgeSettings, socket: WebSocket): void {
+  private onClose(settings: BridgeSettings, socket: WebSocket, event: CloseEvent): void {
     // Ignore a close event from a socket replaced by restart().
     if (this.socket !== socket) return;
     this.heartbeat.stop();
     this.socket = undefined;
     if (this.stopped) return;
     const delay = this.backoff.next();
-    this.debug(settings, `WebSocket disconnected; retrying in ${delay}ms.`);
+    const reason = event.reason ? ` (${event.reason})` : "";
+    this.debug(settings, `WebSocket disconnected with code ${event.code}${reason}; retrying in ${delay}ms.`);
     this.reconnectTimer = setTimeout(() => this.connect(), delay);
   }
 
@@ -126,7 +127,7 @@ export class BridgeClient {
 function createRegistration(): BridgeRegistration {
   const plutonium = getPlutoniumCapabilities();
   return {
-    bridgeVersion: "0.2.1",
+    bridgeVersion: "0.2.3",
     world: { id: game.world?.id ?? "", title: game.world?.title ?? "" },
     user: { id: game.user?.id ?? "", name: game.user?.name ?? "", isGM: true },
     foundry: { version: game.version },

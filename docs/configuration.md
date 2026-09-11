@@ -58,4 +58,7 @@ superviser un Chromium headless et réauthentifier le compte `MCP Bridge GM`.
 Les variables, commandes Docker et états de diagnostic sont détaillés dans
 [Session Foundry GM automatique](headless-foundry.md). Le chargement du monde
 dispose par défaut de cinq minutes, réglables avec
-`FOUNDRY_HEADLESS_READY_TIMEOUT_MS`.
+`FOUNDRY_HEADLESS_READY_TIMEOUT_MS`. Après que Foundry signale le monde comme
+prêt, le serveur accorde trois minutes supplémentaires au module pour établir
+le pont (`FOUNDRY_HEADLESS_BRIDGE_GRACE_MS`). Ce délai couvre notamment le hook
+`ready` asynchrone de Plutonium.

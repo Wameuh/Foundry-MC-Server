@@ -17,15 +17,15 @@ Committer puis pousser les changements :
 
 ```sh
 git add .
-git commit -m "Release v0.2.1"
+git commit -m "Release v0.2.3"
 git push origin main
 ```
 
 Créer et pousser le tag correspondant exactement à la version du manifeste :
 
 ```sh
-git tag -a v0.2.1 -m "Foundry MCP Bridge v0.2.1"
-git push origin v0.2.1
+git tag -a v0.2.3 -m "Foundry MCP Bridge v0.2.3"
+git push origin v0.2.3
 ```
 
 Le tag déclenche les tests, la construction de l'archive et la création de la
@@ -35,8 +35,8 @@ release GitHub. Vérifier ensuite les deux URL utilisées par Foundry :
 curl --fail --location \
   https://raw.githubusercontent.com/Wameuh/Foundry-MC-Server/main/apps/foundry-module/module.json
 
-curl --fail --location --output /tmp/foundry-mcp-bridge-0.2.1.zip \
-  https://github.com/Wameuh/Foundry-MC-Server/releases/download/v0.2.1/foundry-mcp-bridge-0.2.1.zip
+curl --fail --location --output /tmp/foundry-mcp-bridge-0.2.3.zip \
+  https://github.com/Wameuh/Foundry-MC-Server/releases/download/v0.2.3/foundry-mcp-bridge-0.2.3.zip
 
-unzip -l /tmp/foundry-mcp-bridge-0.2.1.zip
+unzip -l /tmp/foundry-mcp-bridge-0.2.3.zip
 ```

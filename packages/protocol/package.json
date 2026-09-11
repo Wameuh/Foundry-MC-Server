@@ -1,6 +1,6 @@
 {
   "name": "@foundry-mcp/protocol",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "import": "./dist/constants.js"
     }
   },
   "files": [

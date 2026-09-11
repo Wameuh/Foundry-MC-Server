@@ -88,6 +88,7 @@ function handleConnection(
           options.config.bridgeSecret,
           options.config.targetWorldId
         )) {
+          options.logger.warn("Rejected Foundry bridge authentication proof");
           socket.close(4003, "Bridge authentication failed");
           return;
         }
