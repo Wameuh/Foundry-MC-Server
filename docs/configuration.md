@@ -1,5 +1,33 @@
 # Configuration
 
+## Règles transmises aux agents
+
+Le fichier `agent_rules.md`, à la racine du dépôt, est la source unique des
+règles opérationnelles Foundry. Il peut être amendé lorsqu’une erreur ou une
+bonne pratique est découverte.
+
+À chaque nouvelle connexion MCP, le serveur relit le fichier et place son
+contenu complet dans les instructions de connexion. Il l’expose également :
+
+- comme ressource MCP `foundry://agent-rules` ;
+- comme outil en lecture seule `foundry_get_agent_rules`.
+
+La ressource et l’outil relisent le fichier à chaque appel. Un agent déjà
+connecté peut donc récupérer une modification sans redémarrer le serveur en
+appelant l’outil. En revanche, ses instructions initiales ne changent qu’après
+une nouvelle connexion.
+
+Avec le Compose fourni, le fichier hôte est monté en lecture seule dans le
+conteneur. Après une modification, aucune reconstruction de l’image n’est
+nécessaire. Le fichier est une configuration privilégiée : seuls les
+administrateurs du serveur doivent pouvoir le modifier, car son contenu est
+présenté aux agents comme une instruction.
+
+Le serveur refuse un fichier vide ou supérieur à 128 Kio. Les protections
+critiques restent imposées par les schémas et le code du serveur ; le Markdown
+ne remplace pas la confirmation des suppressions, les permissions GM ou la
+validation des Documents.
+
 ## Créer le fichier `.env`
 
 Depuis la racine du dépôt :
@@ -22,10 +50,11 @@ sed -i "s|FOUNDRY_ORIGIN=https://foundry.example.com|FOUNDRY_ORIGIN=${FOUNDRY_PU
 sed -i "s|MCP_ALLOWED_HOSTS=mcp.example.com,localhost,127.0.0.1|MCP_ALLOWED_HOSTS=${MCP_PUBLIC_HOST},localhost,127.0.0.1|" .env
 ```
 
-Vérifier les noms des variables sans afficher leurs secrets :
+Vérifier la syntaxe Compose sans afficher la configuration résolue ni les
+secrets :
 
 ```sh
-sed -E 's/^(MCP_BEARER_TOKEN|FOUNDRY_BRIDGE_SECRET)=.*/\1=<masqué>/' .env
+docker compose -f deploy/compose.example.yaml config --quiet
 ```
 
 ## Variables du serveur

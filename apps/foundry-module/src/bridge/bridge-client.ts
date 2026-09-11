@@ -1,4 +1,4 @@
-import type { BridgeRegistration, BridgeRequest } from "@foundry-mcp/protocol";
+import { APPLICATION_VERSION, type BridgeRegistration, type BridgeRequest } from "@foundry-mcp/protocol";
 import { createChallengeHmac } from "./authenticate";
 import { dispatchRequest } from "./dispatcher";
 import { Heartbeat } from "./heartbeat";
@@ -127,7 +127,7 @@ export class BridgeClient {
 function createRegistration(): BridgeRegistration {
   const plutonium = getPlutoniumCapabilities();
   return {
-    bridgeVersion: "0.2.3",
+    bridgeVersion: APPLICATION_VERSION,
     world: { id: game.world?.id ?? "", title: game.world?.title ?? "" },
     user: { id: game.user?.id ?? "", name: game.user?.name ?? "", isGM: true },
     foundry: { version: game.version },

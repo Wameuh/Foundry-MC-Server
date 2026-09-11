@@ -20,9 +20,10 @@ https://raw.githubusercontent.com/Wameuh/Foundry-MC-Server/main/apps/foundry-mod
 4. cliquer sur **Installer** ;
 5. ouvrir le monde D&D5e et activer **Foundry MCP Bridge** dans la gestion des modules.
 
-Cette URL utilise la dernière version publiée dans la branche `main`.
-Le manifeste télécharge automatiquement l'archive correspondante. Pour une
-installation locale avant la première release, voir « Archive locale » plus bas.
+Cette URL charge le manifeste courant de la branche `main`. Le champ
+`download` du manifeste pointe vers l'archive de la release GitHub publiée et
+validée correspondante. Pour tester une modification qui n'est pas encore
+publiée, voir « Archive locale » plus bas.
 
 ## 2. Installer le serveur MCP avec Docker
 
@@ -62,6 +63,17 @@ Afficher les journaux en cas de problème :
 ```sh
 docker compose -f deploy/compose.example.yaml logs --tail=100 foundry-mcp
 ```
+
+Amender les règles apprises par les agents :
+
+```sh
+nano agent_rules.md
+```
+
+Le fichier est monté en lecture seule dans le conteneur et relu à chaque
+appel de `foundry_get_agent_rules`. Il n’est donc pas nécessaire de reconstruire
+ou redémarrer le serveur. Ouvrir une nouvelle session MCP pour que son contenu
+actualisé soit également inclus dans les instructions initiales de l’agent.
 
 Le port `3210` reste lié à `127.0.0.1`. Configurer ensuite le reverse proxy
 HTTPS/WSS avec l'exemple `deploy/nginx/foundry-mcp.example.conf`.
@@ -123,14 +135,15 @@ publiée ou pour tester une modification locale :
 ```sh
 npm ci
 npm run package:module
-unzip -l artifacts/foundry-mcp-bridge-0.2.3.zip
+MODULE_VERSION="$(node -p "require('./apps/foundry-module/module.json').version")"
+unzip -l "artifacts/foundry-mcp-bridge-${MODULE_VERSION}.zip"
 ```
 
 Extraire ensuite l'archive dans le répertoire de données Foundry :
 
 ```sh
 mkdir -p /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
-unzip artifacts/foundry-mcp-bridge-0.2.3.zip \
+unzip "artifacts/foundry-mcp-bridge-${MODULE_VERSION}.zip" \
   -d /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
 ```
 

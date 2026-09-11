@@ -24,7 +24,9 @@ function collectDocuments(value: unknown, output: FoundryDocument[], seen: WeakS
     return;
   }
   if (Array.isArray(value)) value.forEach((entry) => collectDocuments(entry, output, seen));
-  else Object.values(value).forEach((entry) => collectDocuments(entry, output, seen));
+  else Object.entries(value)
+    .filter(([key]) => key !== "actor" && key !== "destination" && key !== "options" && key !== "importOpts")
+    .forEach(([, entry]) => collectDocuments(entry, output, seen));
 }
 
 function isDocument(value: object): value is FoundryDocument {

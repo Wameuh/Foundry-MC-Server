@@ -7,9 +7,13 @@
 **`PLUTONIUM_IMPORT_TIMEOUT`** : vérifier la connexion du navigateur GM et
 consulter les notifications Foundry. Les imports de créatures peuvent charger
 le catalogue, les groupes légendaires et les images depuis la source configurée
-dans Plutonium. Si `5e.tools` est inaccessible ou répond `403`, configurer le
-backend ou un miroir de données Plutonium, ou fournir une entrée JSON autonome.
-Ne pas relancer aveuglément un import non idempotent.
+dans Plutonium. Pour le contenu officiel, vérifier d’abord que **Avoid Loading
+Local Data** est désactivé : Plutonium fournit ses propres copies des données.
+Si une ressource manque, configurer le CDN ou un miroir dans **Data Sources**.
+Le backend Plutonium n’est pas requis pour charger le catalogue standard ; il
+peut être nécessaire pour certaines opérations de fichiers, d’images ou de
+packages. Ne pas relancer aveuglément un import non idempotent : le travail en
+cours n’est pas annulé par le timeout MCP et peut se terminer plus tard.
 
 **Erreur de permission** : seul un utilisateur GM peut enregistrer le pont et modifier le monde.
 

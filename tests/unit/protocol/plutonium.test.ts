@@ -27,18 +27,45 @@ describe("Plutonium schemas", () => {
     ).toBe(false);
   });
 
-  it("requires prop and data.__prop to match", () => {
+  it("accepts the 5etools monster data alias for a creature MCP entry", () => {
     const result = PlutoniumEntriesImportSchema.safeParse({
       entries: [
         {
-          prop: "spell",
+          prop: "creature",
           data: {
-            name: "Fireball",
-            source: "PHB",
-            __prop: "creature"
+            name: "Goblin",
+            source: "MM",
+            __prop: "monster"
           }
         }
       ],
+      destination: { type: "world" }
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts the legacy matching prop for non-creature entries", () => {
+    const result = PlutoniumEntriesImportSchema.safeParse({
+      entries: [{ prop: "spell", data: { name: "Fireball", source: "PHB", __prop: "spell" } }],
+      destination: { type: "world" }
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects unrelated data properties", () => {
+    const result = PlutoniumEntriesImportSchema.safeParse({
+      entries: [{ prop: "spell", data: { name: "Fireball", source: "PHB", __prop: "monster" } }],
+      destination: { type: "world" }
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects the non-canonical creature data property", () => {
+    const result = PlutoniumEntriesImportSchema.safeParse({
+      entries: [{ prop: "creature", data: { name: "Goblin", source: "MM", __prop: "creature" } }],
       destination: { type: "world" }
     });
 

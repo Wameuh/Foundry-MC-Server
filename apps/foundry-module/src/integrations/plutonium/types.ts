@@ -12,6 +12,9 @@ export type PlutoniumApi = {
       getCustomUuid(input: { tag: string; text: string }): string;
     };
   };
+  config?: {
+    getValue(section: string, key: string): unknown;
+  };
   hooks: {
     on(event: string, callback: (...args: unknown[]) => void): unknown;
     off?(event: string, callback: (...args: unknown[]) => void): void;

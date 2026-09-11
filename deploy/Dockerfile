@@ -1,6 +1,6 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
-COPY package*.json tsconfig.base.json eslint.config.mjs ./
+COPY package*.json tsconfig.base.json eslint.config.mjs agent_rules.md ./
 COPY apps ./apps
 COPY packages ./packages
 RUN npm ci && npm run build
@@ -12,6 +12,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends chromium \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/package*.json ./
+COPY --from=build /app/agent_rules.md ./agent_rules.md
 COPY --from=build /app/apps/mcp-server/package*.json ./apps/mcp-server/
 COPY --from=build /app/packages/protocol/package*.json ./packages/protocol/
 COPY --from=build /app/apps/mcp-server/dist ./apps/mcp-server/dist

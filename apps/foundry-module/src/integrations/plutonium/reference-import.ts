@@ -20,6 +20,18 @@ export async function importPlutoniumReference(payload: unknown, operationId: st
   }
   const api = getPlutoniumApi();
   if (!api) throw plutoniumUnavailable(capabilities);
+  let isPatchFromUuid = false;
+  try {
+    isPatchFromUuid = api.config?.getValue("misc", "isPatchFromUuid") === true;
+  } catch {
+    // Treat an unavailable public setting as disabled.
+  }
+  if (!isPatchFromUuid) {
+    throw new PlutoniumError(
+      "PLUTONIUM_REFERENCE_UNSUPPORTED",
+      "Plutonium is not configured to resolve faux compendium UUIDs (misc.isPatchFromUuid must be enabled).",
+    );
+  }
   let uuid: string;
   try {
     uuid = api.util.uuidFauxCompendium.getCustomUuid({ tag: type, text: `${name}|${source}` });
@@ -41,7 +53,10 @@ function safeError(error: unknown): string {
 
 async function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new PlutoniumError("PLUTONIUM_IMPORT_TIMEOUT", "Plutonium import timed out.")), milliseconds);
+    const timer = setTimeout(() => reject(new PlutoniumError(
+      "PLUTONIUM_IMPORT_TIMEOUT",
+      "Plutonium import timed out; the underlying import may still complete later and cannot be rolled back by this operation.",
+    )), milliseconds);
     void promise.then((value) => { clearTimeout(timer); resolve(value); }, (error: unknown) => {
       clearTimeout(timer);
       reject(error instanceof Error ? error : new Error("Unknown Plutonium rejection."));

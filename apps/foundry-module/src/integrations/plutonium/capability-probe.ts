@@ -1,7 +1,7 @@
 import { getPlutoniumCompatibility } from "./compatibility";
 import { getPlutoniumApi, getPlutoniumModule } from "./detect";
 import { PLUTONIUM_IMPORTERS } from "./importer-registry";
-import type { PlutoniumApi, PlutoniumCapabilities, PlutoniumImporter } from "./types";
+import type { PlutoniumApi, PlutoniumCapabilities } from "./types";
 
 // Module bundles are evaluated before Foundry has populated game.modules.
 // Keep startup side-effect free and probe Plutonium only from the ready hook.
@@ -16,14 +16,9 @@ let capabilities: PlutoniumCapabilities = {
 };
 let refreshInFlight: Promise<PlutoniumCapabilities> | undefined;
 let probedApi: PlutoniumApi | undefined;
-let probedImporters = new Map<string, PlutoniumImporter>();
 
 export function getPlutoniumCapabilities(): PlutoniumCapabilities {
   return { ...capabilities, importers: [...capabilities.importers], destinations: [...capabilities.destinations] };
-}
-
-export function getProbedPlutoniumImporter(api: PlutoniumApi, prop: string): PlutoniumImporter | undefined {
-  return api === probedApi ? probedImporters.get(prop) : undefined;
 }
 
 export async function refreshPlutoniumCapabilities(): Promise<PlutoniumCapabilities> {
@@ -32,7 +27,7 @@ export async function refreshPlutoniumCapabilities(): Promise<PlutoniumCapabilit
     return getPlutoniumCapabilities();
   }
   if (refreshInFlight) return await refreshInFlight;
-  const refresh = probePlutoniumCapabilities();
+  const refresh = Promise.resolve(probePlutoniumCapabilities());
   refreshInFlight = refresh;
   try {
     return await refresh;
@@ -41,38 +36,35 @@ export async function refreshPlutoniumCapabilities(): Promise<PlutoniumCapabilit
   }
 }
 
-async function probePlutoniumCapabilities(): Promise<PlutoniumCapabilities> {
+function probePlutoniumCapabilities(): PlutoniumCapabilities {
   const base = createBaseCapabilities();
   const api = getPlutoniumApi();
   if (!base.compatible || !api) {
     probedApi = undefined;
-    probedImporters = new Map();
     capabilities = api ? base : { ...base, compatible: false, reason: base.reason ?? "The expected public API is unavailable." };
     return getPlutoniumCapabilities();
   }
-  const importers: string[] = [];
-  const importerInstances = new Map<string, PlutoniumImporter>();
-  for (const prop of PLUTONIUM_IMPORTERS) {
-    try {
-      const importer = await api.importer.pGetImporter({ prop });
-      if (importer && typeof importer.pImportEntry === "function") {
-        importers.push(prop);
-        importerInstances.set(prop, importer);
-      }
-    } catch {
-      // Unsupported importers are capabilities, not fatal startup errors.
-    }
-  }
+  // pGetImporter calls pInit and may load substantial data. Do not eagerly
+  // initialize every importer during capability discovery; importers are
+  // resolved lazily by the operation which needs them.
+  const importers = [...PLUTONIUM_IMPORTERS];
   capabilities = {
     ...base,
-    importJson: importers.length > 0,
-    importReference: true,
+    importJson: true,
+    importReference: isFauxUuidPatchEnabled(api),
     importers,
     destinations: ["world", "actor", "pack"],
   };
   probedApi = api;
-  probedImporters = importerInstances;
   return getPlutoniumCapabilities();
+}
+
+function isFauxUuidPatchEnabled(api: PlutoniumApi): boolean {
+  try {
+    return api.config?.getValue("misc", "isPatchFromUuid") === true;
+  } catch {
+    return false;
+  }
 }
 
 function createBaseCapabilities(): PlutoniumCapabilities {

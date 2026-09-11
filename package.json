@@ -1,6 +1,6 @@
 {
   "name": "foundry-mcp",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,9 +13,10 @@
   "scripts": {
     "build": "npm run build -w @foundry-mcp/protocol && npm run build -w @foundry-mcp/server && npm run build -w @foundry-mcp/foundry-module",
     "typecheck": "npm run build -w @foundry-mcp/protocol && npm run typecheck -w @foundry-mcp/server && npm run typecheck -w @foundry-mcp/foundry-module",
-    "check": "npm run typecheck && npm run lint",
+    "check": "npm run typecheck && npm run lint && npm run verify:manifests",
     "lint": "eslint .",
     "package:module": "node scripts/package-foundry-module.mjs",
+    "verify:manifests": "node scripts/verify-manifests.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "npm run clean --workspaces --if-present"

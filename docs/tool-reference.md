@@ -1,5 +1,9 @@
 # Outils MCP
 
+Règles : `foundry_get_agent_rules` retourne la version actuelle du manuel
+administrateur. Le même contenu est disponible comme ressource
+`foundry://agent-rules` et est inclus dans les instructions de connexion MCP.
+
 Lecture : `foundry_get_status`, `foundry_get_context`, `foundry_get_schema`, `foundry_search_documents`, `foundry_get_document`, `foundry_search_compendiums`.
 
 Écriture : `foundry_create_documents`, `foundry_update_documents`, `foundry_create_embedded`, `foundry_update_embedded`, `foundry_import_compendium`, `dnd5e_build_character`.

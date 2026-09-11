@@ -30,6 +30,14 @@ export const PlutoniumImporterTypeSchema = z.enum([
 ]);
 export type PlutoniumImporterType = z.infer<typeof PlutoniumImporterTypeSchema>;
 
+// Plutonium's creature importer is exposed as `creature` at the MCP boundary,
+// while 5etools creature JSON uses `monster` as its data property.
+export const PlutoniumDataPropSchema = z.enum([
+  ...PlutoniumImporterTypeSchema.options,
+  "monster"
+]);
+export type PlutoniumDataProp = z.infer<typeof PlutoniumDataPropSchema>;
+
 export const PlutoniumCapabilitiesSchema = z
   .object({
     active: z.boolean(),
@@ -63,17 +71,19 @@ export const PlutoniumEntrySchema = z
       z.object({
         name: z.string().trim().min(1).max(512),
         source: z.string().trim().min(1).max(128),
-        __prop: PlutoniumImporterTypeSchema
+        __prop: PlutoniumDataPropSchema
       })
     )
   })
   .strict()
   .superRefine((entry, context) => {
-    if (entry.prop !== entry.data.__prop) {
+    const isCanonicalAlias = entry.prop === "creature" && entry.data.__prop === "monster";
+    const isMatchingNonCreature = entry.prop !== "creature" && entry.prop === entry.data.__prop;
+    if (!isCanonicalAlias && !isMatchingNonCreature) {
       context.addIssue({
         code: "custom",
         path: ["data", "__prop"],
-        message: "data.__prop must match prop"
+        message: "data.__prop must match prop or its Plutonium data alias"
       });
     }
   });

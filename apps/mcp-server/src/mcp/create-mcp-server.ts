@@ -1,21 +1,20 @@
 import { McpServer } from "@modelcontextprotocol/server";
+import { APPLICATION_VERSION } from "@foundry-mcp/protocol";
 
+import { buildServerInstructions, loadAgentRules, registerAgentRules } from "./agent-rules.js";
 import { registerTools } from "./register-tools.js";
 import type { ToolDependencies } from "./tools/shared.js";
 
 export function createFoundryMcpServer(dependencies: ToolDependencies): McpServer {
+  const agentRules = loadAgentRules();
   const server = new McpServer(
-    { name: "foundry-mcp", version: "0.2.3" },
+    { name: "foundry-mcp", version: APPLICATION_VERSION },
     {
-      capabilities: { tools: {} },
-      instructions: [
-        "Use foundry_get_context before acting on phrases such as 'this sheet' or 'the selected token'.",
-        "Use foundry_get_schema before changing unfamiliar document fields.",
-        "Never claim a deletion is complete until foundry_prepare_delete and then foundry_confirm_delete have both succeeded.",
-        "Use Plutonium tools only after checking plutonium_get_capabilities."
-      ].join(" ")
+      capabilities: { resources: {}, tools: {} },
+      instructions: buildServerInstructions(agentRules),
     }
   );
+  registerAgentRules(server);
   registerTools(server, dependencies);
   return server;
 }

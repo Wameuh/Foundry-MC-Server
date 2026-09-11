@@ -4,7 +4,7 @@ export function createFakePlutonium() {
   const api = {
     importer: {
       async pGetImporter({ prop }: { prop: string }) {
-        if (!['spell', 'creature', 'item'].includes(prop)) return null;
+        if (!['spell', 'creature', 'monster', 'item'].includes(prop)) return null;
         return {
           async pImportEntry(entry: Record<string, unknown>) {
             imported.push(entry);

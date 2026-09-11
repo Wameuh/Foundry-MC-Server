@@ -78,7 +78,34 @@ describe("Foundry dispatcher feature journey", () => {
     });
     expect(result.ok).toBe(true);
     expect(fake.imported).toEqual([{ name: "Fireball", source: "PHB", __prop: "spell" }]);
-    expect(importerProbes).toBe(14);
+    expect(importerProbes).toBe(1);
     if (result.ok) expect(result.result).toMatchObject({ provider: "plutonium", status: "completed" });
+  });
+
+  it("maps the MCP creature type to canonical 5etools monster data", async () => {
+    const fake = createFakePlutonium();
+    installFakeFoundry([]);
+    (globalThis as Record<string, unknown>).game = {
+      user: { isGM: true, id: "gm", name: "GM" },
+      modules: new Map([["plutonium", { active: true, version: "2.18.3.v14", api: fake.api }]]),
+      packs: new Map(),
+      settings: { get: () => false },
+    };
+    (globalThis as Record<string, unknown>).ui = { notifications: { info: () => undefined, warn: () => undefined, error: () => undefined } };
+    const { dispatchRequest } = await import("../../apps/foundry-module/src/bridge/dispatcher.js");
+
+    const result = await dispatchRequest({
+      requestId: "plutonium-creature-1",
+      operationId: "op-plutonium-creature",
+      operation: BridgeOperation.PLUTONIUM_IMPORT_ENTRIES,
+      payload: {
+        entries: [{ prop: "creature", data: { name: "Goblin", source: "MM", __prop: "monster" } }],
+        destination: { type: "world" },
+      },
+      deadline: Date.now() + 1_000,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fake.imported).toEqual([{ name: "Goblin", source: "MM", __prop: "monster" }]);
   });
 });

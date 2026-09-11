@@ -1,3 +1,4 @@
+export const APPLICATION_VERSION = "0.2.4" as const;
 export const PROTOCOL_VERSION = "1.0.0" as const;
 export const DEFAULT_OPERATION_TIMEOUT_MS = 30_000;
 export const PLUTONIUM_OPERATION_TIMEOUT_MS = 120_000;

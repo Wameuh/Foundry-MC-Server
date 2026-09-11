@@ -27,8 +27,11 @@ Uniquement pour développer ou tester avant publication :
 ```sh
 npm ci
 npm run package:module
-unzip -l artifacts/foundry-mcp-bridge-0.1.1.zip
+MODULE_VERSION="$(node -p "require('./apps/foundry-module/module.json').version")"
+unzip -l "artifacts/foundry-mcp-bridge-${MODULE_VERSION}.zip"
 ```
 
-Le navigateur GM doit rester ouvert et connecté : il exécute les API Foundry
-et Plutonium. Le serveur MCP seul ne peut pas manipuler le monde.
+Une session de navigateur GM doit rester active : elle peut être ouverte
+manuellement ou supervisée automatiquement par le serveur MCP. Cette session
+exécute les API Foundry et Plutonium ; le serveur MCP seul ne peut pas manipuler
+le monde.

@@ -8,6 +8,9 @@ type FoundryGame = {
 };
 
 function installPlutonium(version: string, api: unknown = createFakePlutonium().api) {
+  if (api && typeof api === "object") {
+    (api as Record<string, unknown>).config = { getValue: () => true };
+  }
   (globalThis as Record<string, unknown>).game = {
     modules: new Map([["plutonium", { active: true, version, api }]]),
   } satisfies FoundryGame;
@@ -74,7 +77,9 @@ describe("Plutonium compatibility feature", () => {
     });
 
     const module = (globalThis as Record<string, unknown>).game as FoundryGame;
-    module.modules.get("plutonium")!.api = createFakePlutonium().api;
+    const recoveredApi = createFakePlutonium().api;
+    (recoveredApi as Record<string, unknown>).config = { getValue: () => true };
+    module.modules.get("plutonium")!.api = recoveredApi;
 
     await expect(refreshPlutoniumCapabilities()).resolves.toMatchObject({
       active: true,
@@ -84,7 +89,7 @@ describe("Plutonium compatibility feature", () => {
     });
   });
 
-  it("reuses a successful probe while the Plutonium API instance is unchanged", async () => {
+  it("does not eagerly initialize importers during capability probing", async () => {
     const { api } = createFakePlutonium();
     let importerProbes = 0;
     const originalGetImporter = api.importer.pGetImporter;
@@ -98,7 +103,20 @@ describe("Plutonium compatibility feature", () => {
     const probesAfterFirstRefresh = importerProbes;
     await refreshPlutoniumCapabilities();
 
-    expect(probesAfterFirstRefresh).toBeGreaterThan(0);
-    expect(importerProbes).toBe(probesAfterFirstRefresh);
+    expect(probesAfterFirstRefresh).toBe(0);
+    expect(importerProbes).toBe(0);
+  });
+
+  it("does not advertise reference imports when Plutonium's fromUuid patch is disabled", async () => {
+    const { api } = createFakePlutonium();
+    (api as Record<string, unknown>).config = { getValue: () => false };
+    (globalThis as Record<string, unknown>).game = {
+      modules: new Map([["plutonium", { active: true, version: "2.18.3.v14", api }]]),
+    } satisfies FoundryGame;
+
+    await expect(refreshPlutoniumCapabilities()).resolves.toMatchObject({
+      importJson: true,
+      importReference: false,
+    });
   });
 });

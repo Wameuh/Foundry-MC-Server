@@ -4,7 +4,8 @@ Le workflow GitHub Actions `.github/workflows/release.yml` construit et publie
 l'archive du module. L'utilisateur final n'exécute donc aucune commande npm.
 
 Après avoir aligné la version de `apps/foundry-module/module.json` et son URL
-`download`, valider le projet :
+`download`, des quatre `package.json` et de `APPLICATION_VERSION`, valider le
+projet. `verify:manifests` refuse une publication si ces versions divergent :
 
 ```sh
 npm ci
@@ -13,19 +14,23 @@ npm test
 npm run package:module
 ```
 
-Committer puis pousser les changements :
+Contrôler les fichiers à publier, puis committer et pousser les changements.
+Ne jamais ajouter `.env` ou un fichier contenant des identifiants :
 
 ```sh
-git add .
-git commit -m "Release v0.2.3"
+git status --short
+git add -A
+git diff --cached --check
+git commit -m "Release v0.2.4"
 git push origin main
 ```
 
 Créer et pousser le tag correspondant exactement à la version du manifeste :
 
 ```sh
-git tag -a v0.2.3 -m "Foundry MCP Bridge v0.2.3"
-git push origin v0.2.3
+VERSION="$(node -p "require('./apps/foundry-module/module.json').version")"
+git tag -a "v${VERSION}" -m "Foundry MCP Bridge v${VERSION}"
+git push origin "v${VERSION}"
 ```
 
 Le tag déclenche les tests, la construction de l'archive et la création de la
@@ -35,8 +40,8 @@ release GitHub. Vérifier ensuite les deux URL utilisées par Foundry :
 curl --fail --location \
   https://raw.githubusercontent.com/Wameuh/Foundry-MC-Server/main/apps/foundry-module/module.json
 
-curl --fail --location --output /tmp/foundry-mcp-bridge-0.2.3.zip \
-  https://github.com/Wameuh/Foundry-MC-Server/releases/download/v0.2.3/foundry-mcp-bridge-0.2.3.zip
+curl --fail --location --output "/tmp/foundry-mcp-bridge-${VERSION}.zip" \
+  "https://github.com/Wameuh/Foundry-MC-Server/releases/download/v${VERSION}/foundry-mcp-bridge-${VERSION}.zip"
 
-unzip -l /tmp/foundry-mcp-bridge-0.2.3.zip
+unzip -l "/tmp/foundry-mcp-bridge-${VERSION}.zip"
 ```
