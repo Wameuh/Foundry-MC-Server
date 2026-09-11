@@ -5,7 +5,7 @@ import type { ToolDependencies } from "./tools/shared.js";
 
 export function createFoundryMcpServer(dependencies: ToolDependencies): McpServer {
   const server = new McpServer(
-    { name: "foundry-mcp", version: "0.1.0" },
+    { name: "foundry-mcp", version: "0.1.1" },
     {
       capabilities: { tools: {} },
       instructions: [

@@ -2,10 +2,10 @@
   "id": "foundry-mcp-bridge",
   "title": "Foundry MCP Bridge",
   "description": "Secure bridge between a remote MCP server and Foundry VTT.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "url": "https://github.com/Wameuh/Foundry-MC-Server",
   "manifest": "https://raw.githubusercontent.com/Wameuh/Foundry-MC-Server/main/apps/foundry-module/module.json",
-  "download": "https://github.com/Wameuh/Foundry-MC-Server/releases/download/v0.1.0/foundry-mcp-bridge-0.1.0.zip",
+  "download": "https://github.com/Wameuh/Foundry-MC-Server/releases/download/v0.1.1/foundry-mcp-bridge-0.1.1.zip",
   "authors": [{ "name": "Foundry MCP contributors" }],
   "esmodules": ["foundry-mcp.js"],
   "languages": [

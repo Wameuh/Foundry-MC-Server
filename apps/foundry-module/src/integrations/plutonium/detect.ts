@@ -3,7 +3,7 @@ import type { PlutoniumApi } from "./types";
 export const SUPPORTED_PLUTONIUM_VERSION = "2.18.1.v14";
 
 export function getPlutoniumModule() {
-  return game.modules.get("plutonium");
+  return game.modules?.get("plutonium");
 }
 
 export function getPlutoniumApi(): PlutoniumApi | undefined {

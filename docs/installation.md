@@ -20,7 +20,7 @@ https://raw.githubusercontent.com/Wameuh/Foundry-MC-Server/main/apps/foundry-mod
 4. cliquer sur **Installer** ;
 5. ouvrir le monde D&D5e et activer **Foundry MCP Bridge** dans la gestion des modules.
 
-Cette URL devient utilisable après la publication de la release GitHub `v0.1.0`.
+Cette URL utilise la dernière version publiée dans la branche `main`.
 Le manifeste télécharge automatiquement l'archive correspondante. Pour une
 installation locale avant la première release, voir « Archive locale » plus bas.
 
@@ -109,14 +109,14 @@ publiée ou pour tester une modification locale :
 ```sh
 npm ci
 npm run package:module
-unzip -l artifacts/foundry-mcp-bridge-0.1.0.zip
+unzip -l artifacts/foundry-mcp-bridge-0.1.1.zip
 ```
 
 Extraire ensuite l'archive dans le répertoire de données Foundry :
 
 ```sh
 mkdir -p /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
-unzip artifacts/foundry-mcp-bridge-0.1.0.zip \
+unzip artifacts/foundry-mcp-bridge-0.1.1.zip \
   -d /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
 ```
 

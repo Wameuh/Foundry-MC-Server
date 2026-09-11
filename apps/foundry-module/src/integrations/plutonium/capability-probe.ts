@@ -3,7 +3,17 @@ import { getPlutoniumApi, getPlutoniumModule } from "./detect";
 import { PLUTONIUM_IMPORTERS } from "./importer-registry";
 import type { PlutoniumCapabilities } from "./types";
 
-let capabilities: PlutoniumCapabilities = createBaseCapabilities();
+// Module bundles are evaluated before Foundry has populated game.modules.
+// Keep startup side-effect free and probe Plutonium only from the ready hook.
+let capabilities: PlutoniumCapabilities = {
+  active: false,
+  compatible: false,
+  importJson: false,
+  importReference: false,
+  importers: [],
+  destinations: [],
+  reason: "Plutonium capabilities have not been probed yet.",
+};
 
 export function getPlutoniumCapabilities(): PlutoniumCapabilities {
   return { ...capabilities, importers: [...capabilities.importers], destinations: [...capabilities.destinations] };

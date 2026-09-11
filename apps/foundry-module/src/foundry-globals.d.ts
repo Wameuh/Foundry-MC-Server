@@ -44,7 +44,7 @@ interface FoundryGame {
     register(module: string, key: string, data: Record<string, unknown>): void;
     get(module: string, key: string): unknown;
   };
-  modules: Map<string, { active: boolean; version?: string; api?: unknown }>;
+  modules?: Map<string, { active: boolean; version?: string; api?: unknown }>;
   collections: Map<string, FoundryCollection>;
   packs: Map<string, FoundryPack>;
   scenes?: FoundryCollection;

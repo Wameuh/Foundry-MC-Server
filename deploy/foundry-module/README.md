@@ -27,7 +27,7 @@ Uniquement pour développer ou tester avant publication :
 ```sh
 npm ci
 npm run package:module
-unzip -l artifacts/foundry-mcp-bridge-0.1.0.zip
+unzip -l artifacts/foundry-mcp-bridge-0.1.1.zip
 ```
 
 Le navigateur GM doit rester ouvert et connecté : il exécute les API Foundry

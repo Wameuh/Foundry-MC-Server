@@ -40,8 +40,8 @@ export class BridgeClient {
     if (this.stopped || !game.user?.isGM) return;
     const settings = readSettings();
     if (!settings.bridgeUrl || !settings.bridgeSecret) return;
-    if (!isAllowedUrl(settings.bridgeUrl)) {
-      ui.notifications?.error("Foundry MCP: the bridge URL must use WSS (WS is allowed only on localhost).");
+    if (!isAllowedBridgeUrl(settings.bridgeUrl)) {
+      ui.notifications?.error("Foundry MCP: use WSS, or WS only from an HTTP page on a local network.");
       return;
     }
     const socket = new WebSocket(settings.bridgeUrl);
@@ -117,7 +117,7 @@ export class BridgeClient {
 function createRegistration(): BridgeRegistration {
   const plutonium = getPlutoniumCapabilities();
   return {
-    bridgeVersion: "0.1.0",
+    bridgeVersion: "0.1.1",
     world: { id: game.world?.id ?? "", title: game.world?.title ?? "" },
     user: { id: game.user?.id ?? "", name: game.user?.name ?? "", isGM: true },
     foundry: { version: game.version },
@@ -149,11 +149,21 @@ function createRegistration(): BridgeRegistration {
   };
 }
 
-function isAllowedUrl(value: string): boolean {
+export function isAllowedBridgeUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "wss:" || (url.protocol === "ws:" && ["127.0.0.1", "localhost", "::1"].includes(url.hostname));
+    if (url.protocol === "wss:") return true;
+    if (url.protocol !== "ws:" || globalThis.location?.protocol !== "http:") return false;
+    return isLocalNetworkHostname(url.hostname);
   } catch {
     return false;
   }
+}
+
+function isLocalNetworkHostname(hostname: string): boolean {
+  if (["127.0.0.1", "localhost", "::1"].includes(hostname)) return true;
+  if (hostname.endsWith(".local")) return true;
+  if (/^10\./.test(hostname) || /^192\.168\./.test(hostname)) return true;
+  const match = /^172\.(\d{1,2})\./.exec(hostname);
+  return match ? Number(match[1]) >= 16 && Number(match[1]) <= 31 : false;
 }
