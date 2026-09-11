@@ -35,6 +35,10 @@ describe("Foundry module startup feature", () => {
 
     callbacks.get("init")?.();
     expect(register).toHaveBeenCalledTimes(5);
+    const bridgeSettings = register.mock.calls
+      .filter((call) => call[1] === "bridgeUrl" || call[1] === "bridgeSecret");
+    expect(bridgeSettings).toHaveLength(2);
+    expect(bridgeSettings.every((call) => typeof call[2].onChange === "function")).toBe(true);
   });
 
   it("allows a LAN WebSocket only when Foundry itself uses HTTP", async () => {

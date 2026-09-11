@@ -1,18 +1,13 @@
-const encoder = new TextEncoder();
+import { hmac } from "@noble/hashes/hmac";
+import { sha256 } from "@noble/hashes/sha256";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
 
-export async function createChallengeHmac(
+export function createChallengeHmac(
   secret: string,
   nonce: string,
   worldId: string,
   userId: string,
-): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(`${nonce}:${worldId}:${userId}`));
-  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
+): string {
+  const payload = `${nonce}:${worldId}:${userId}`;
+  return bytesToHex(hmac(sha256, utf8ToBytes(secret), utf8ToBytes(payload)));
 }

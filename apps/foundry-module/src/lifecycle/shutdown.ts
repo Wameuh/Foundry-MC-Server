@@ -1,8 +1,8 @@
 import { contextTracker } from "../bridge/context-tracker";
-import { getBridgeClient, unregisterSettingHook } from "./ready";
+import { getBridgeClient, unsubscribeBridgeSettings } from "./ready";
 
 export function onShutdown(): void {
   contextTracker.stop();
-  unregisterSettingHook();
+  unsubscribeBridgeSettings();
   getBridgeClient()?.stop();
 }

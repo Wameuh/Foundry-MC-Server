@@ -71,7 +71,7 @@ export class BridgeClient {
     if (!message || typeof message !== "object" || typeof message.type !== "string") return;
     switch (message.type) {
       case "auth.challenge":
-        await this.authenticate(message.nonce, settings);
+        this.authenticate(message.nonce, settings);
         break;
       case "auth.accepted":
         this.backoff.reset();
@@ -91,7 +91,7 @@ export class BridgeClient {
     }
   }
 
-  private async authenticate(nonce: string, settings: BridgeSettings): Promise<void> {
+  private authenticate(nonce: string, settings: BridgeSettings): void {
     if (typeof nonce !== "string" || nonce.length < 16 || nonce.length > 512) {
       this.socket?.close(1008, "invalid challenge");
       return;
@@ -99,7 +99,7 @@ export class BridgeClient {
     const worldId = game.world?.id;
     const userId = game.user?.id;
     if (!worldId || !userId) return;
-    const hmac = await createChallengeHmac(settings.bridgeSecret, nonce, worldId, userId);
+    const hmac = createChallengeHmac(settings.bridgeSecret, nonce, worldId, userId);
     this.send({ type: "auth.proof", nonce, worldId, userId, hmac });
   }
 
@@ -126,7 +126,7 @@ export class BridgeClient {
 function createRegistration(): BridgeRegistration {
   const plutonium = getPlutoniumCapabilities();
   return {
-    bridgeVersion: "0.2.0",
+    bridgeVersion: "0.2.1",
     world: { id: game.world?.id ?? "", title: game.world?.title ?? "" },
     user: { id: game.user?.id ?? "", name: game.user?.name ?? "", isGM: true },
     foundry: { version: game.version },

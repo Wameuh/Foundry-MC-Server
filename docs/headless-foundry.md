@@ -89,6 +89,7 @@ FOUNDRY_HEADLESS_ACCESS_KEY=une-cle-foundry-forte
 FOUNDRY_HEADLESS_BRIDGE_URL=ws://127.0.0.1:3210/foundry-mcp/bridge
 FOUNDRY_HEADLESS_CHROMIUM_PATH=/usr/bin/chromium
 FOUNDRY_HEADLESS_PROFILE_PATH=./data/chromium-profile
+FOUNDRY_HEADLESS_READY_TIMEOUT_MS=300000
 ```
 
 Démarrer ensuite le serveur :
@@ -103,6 +104,10 @@ Le serveur ouvre `/game`. Si Foundry redirige vers `/join`, il remplit le
 formulaire normal avec le compte dédié. Une fois le monde chargé, il vérifie le
 rôle GM et l'activation du module, configure l'URL et le secret du pont dans le
 profil client, puis attend l'enregistrement du WebSocket.
+
+Le délai de chargement du monde est de cinq minutes par défaut, car D&D5e et
+Plutonium peuvent être lents sur une petite machine. Il est réglable avec
+`FOUNDRY_HEADLESS_READY_TIMEOUT_MS`.
 
 Après une expiration de session, un redémarrage de Foundry ou une déconnexion
 du pont, le navigateur est fermé puis relancé avec un délai fixe configurable.

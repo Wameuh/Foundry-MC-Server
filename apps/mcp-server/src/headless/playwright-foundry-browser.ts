@@ -39,7 +39,7 @@ export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
   async waitForFoundry(): Promise<FoundryClientState> {
     const page = this.requirePage();
     await page.waitForFunction(() => Boolean((globalThis as unknown as { game?: { ready?: boolean } }).game?.ready), undefined, {
-      timeout: 120_000
+      timeout: this.config.readyTimeoutMs
     });
     return page.evaluate((moduleId) => {
       const foundryGame = (globalThis as unknown as {

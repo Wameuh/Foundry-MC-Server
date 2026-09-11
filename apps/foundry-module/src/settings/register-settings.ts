@@ -7,7 +7,21 @@ type Setting = {
   type: StringConstructor | BooleanConstructor;
   default: string | boolean;
   scope?: "world" | "client";
+  onChange?: (value: unknown) => void;
 };
+
+type BridgeSettingsListener = () => void;
+
+const bridgeSettingsListeners = new Set<BridgeSettingsListener>();
+
+function notifyBridgeSettingsChanged(): void {
+  for (const listener of bridgeSettingsListeners) listener();
+}
+
+export function subscribeToBridgeSettings(listener: BridgeSettingsListener): () => void {
+  bridgeSettingsListeners.add(listener);
+  return () => bridgeSettingsListeners.delete(listener);
+}
 
 const SETTINGS: Setting[] = [
   {
@@ -17,6 +31,7 @@ const SETTINGS: Setting[] = [
     type: String,
     default: "",
     scope: "client",
+    onChange: notifyBridgeSettingsChanged,
   },
   {
     key: "bridgeSecret",
@@ -25,6 +40,7 @@ const SETTINGS: Setting[] = [
     type: String,
     default: "",
     scope: "client",
+    onChange: notifyBridgeSettingsChanged,
   },
   {
     key: "notifications",
@@ -60,6 +76,7 @@ export function registerSettings(): void {
       restricted: true,
       type: setting.type,
       default: setting.default,
+      ...(setting.onChange ? { onChange: setting.onChange } : {}),
     });
   }
 }

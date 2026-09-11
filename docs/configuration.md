@@ -50,3 +50,12 @@ protocole.
 Le serveur doit être placé derrière HTTPS/WSS lorsqu'il est accessible hors de
 la machine locale. Le réglage du module Foundry contient l'URL WSS et le secret
 du pont, jamais le jeton MCP.
+
+## Session Foundry automatique
+
+Lorsque Foundry et le serveur MCP partagent la même machine, le serveur peut
+superviser un Chromium headless et réauthentifier le compte `MCP Bridge GM`.
+Les variables, commandes Docker et états de diagnostic sont détaillés dans
+[Session Foundry GM automatique](headless-foundry.md). Le chargement du monde
+dispose par défaut de cinq minutes, réglables avec
+`FOUNDRY_HEADLESS_READY_TIMEOUT_MS`.

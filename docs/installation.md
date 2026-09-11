@@ -123,14 +123,14 @@ publiée ou pour tester une modification locale :
 ```sh
 npm ci
 npm run package:module
-unzip -l artifacts/foundry-mcp-bridge-0.2.0.zip
+unzip -l artifacts/foundry-mcp-bridge-0.2.1.zip
 ```
 
 Extraire ensuite l'archive dans le répertoire de données Foundry :
 
 ```sh
 mkdir -p /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
-unzip artifacts/foundry-mcp-bridge-0.2.0.zip \
+unzip artifacts/foundry-mcp-bridge-0.2.1.zip \
   -d /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
 ```
 

@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HeadlessBrowserConfig } from "../../apps/mcp-server/src/config.js";
+import { computeBridgeHmac } from "../../apps/mcp-server/src/bridge/authentication.js";
+import { createChallengeHmac } from "../../apps/foundry-module/src/bridge/authenticate.js";
 import { prepareFoundrySession } from "../../apps/mcp-server/src/headless/prepare-foundry-session.js";
 import type {
   FoundryBrowserSession,
@@ -15,6 +17,7 @@ const config: HeadlessBrowserConfig = {
   bridgeUrl: "ws://127.0.0.1:3210/foundry-mcp/bridge",
   chromiumPath: "/usr/bin/chromium",
   profilePath: "/tmp/foundry-mcp-test-profile",
+  readyTimeoutMs: 300_000,
   retryMs: 10_000,
   bridgeGraceMs: 60_000
 };
@@ -49,6 +52,15 @@ class FeatureBrowser implements FoundryBrowserSession {
 }
 
 describe("automated Foundry authentication feature", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("creates the same bridge proof on an insecure HTTP page without Web Crypto", async () => {
+    vi.stubGlobal("crypto", {});
+    const inputs = ["shared-secret", "nonce-value-at-least-16", "test", "assistant-user"] as const;
+
+    expect(createChallengeHmac(...inputs)).toBe(computeBridgeHmac(...inputs));
+  });
+
   it("logs in a dedicated GM and configures its local bridge", async () => {
     const browser = new FeatureBrowser("join");
 
