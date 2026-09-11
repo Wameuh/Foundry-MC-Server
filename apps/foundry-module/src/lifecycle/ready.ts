@@ -2,6 +2,7 @@ import { BridgeClient } from "../bridge/bridge-client";
 import { contextTracker } from "../bridge/context-tracker";
 import { refreshPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
 import { MODULE_ID } from "../settings/register-settings";
+import { offerAssistantAccountProvisioning } from "../provisioning/assistant-account";
 
 let bridgeClient: BridgeClient | undefined;
 let settingHookId: number | undefined;
@@ -26,6 +27,8 @@ export async function onReady(): Promise<void> {
       bridgeClient?.restart();
     }
   });
+
+  void offerAssistantAccountProvisioning();
 }
 
 export function getBridgeClient(): BridgeClient | undefined {

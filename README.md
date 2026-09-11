@@ -9,6 +9,8 @@ API publiques de Foundry, ainsi qu'un adaptateur Plutonium optionnel.
 Le module Foundry et le serveur MCP sont deux composants différents :
 
 - le module s'installe depuis l'interface Foundry avec une URL de manifeste ;
+- le module peut créer, après confirmation, un compte GM technique dédié ;
+- le serveur MCP peut lancer et réauthentifier automatiquement un Chromium headless ;
 - le serveur MCP est un service Node.js indépendant, déployé de préférence avec Docker ;
 - Codex CLI se connecte ensuite au serveur MCP en HTTPS.
 

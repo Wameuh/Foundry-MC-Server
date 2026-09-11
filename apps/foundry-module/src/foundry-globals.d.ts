@@ -10,6 +10,7 @@ interface FoundryDocument {
   documentName: string;
   parent?: FoundryDocument;
   pack?: string;
+  role?: number;
   toObject(source?: boolean): Record<string, unknown>;
   update(changes: Record<string, unknown>, options?: Record<string, unknown>): Promise<FoundryDocument>;
   delete(options?: Record<string, unknown>): Promise<FoundryDocument>;
@@ -36,13 +37,14 @@ interface FoundryPack {
 }
 
 interface FoundryGame {
-  user?: { id: string; name: string; isGM: boolean };
+  user?: { id: string; name: string; isGM: boolean; role?: number };
   world?: { id: string; title: string };
   system: { id: string; version: string };
   version: string;
   settings: {
     register(module: string, key: string, data: Record<string, unknown>): void;
     get(module: string, key: string): unknown;
+    set(module: string, key: string, value: unknown): Promise<unknown>;
   };
   modules?: Map<string, { active: boolean; version?: string; api?: unknown }>;
   collections: Map<string, FoundryCollection>;
@@ -50,6 +52,7 @@ interface FoundryGame {
   scenes?: FoundryCollection;
   actors?: FoundryCollection;
   items?: FoundryCollection;
+  users?: FoundryCollection;
 }
 
 interface FoundryHooks {
@@ -66,5 +69,16 @@ declare const canvas: {
 };
 declare const ui: { notifications?: { info(message: string): void; warn(message: string): void; error(message: string): void } };
 declare const CONFIG: Record<string, { documentClass?: FoundryDocumentConstructor }>;
+declare const CONST: { USER_ROLES: { GAMEMASTER: number } };
+declare const foundry: {
+  applications: {
+    api: {
+      DialogV2: {
+        confirm(options: Record<string, unknown>): Promise<boolean>;
+        wait(options: Record<string, unknown>): Promise<unknown>;
+      };
+    };
+  };
+};
 declare function fromUuid(uuid: string): Promise<FoundryDocument | null>;
 declare function getDocumentClass(documentName: string): FoundryDocumentConstructor | undefined;

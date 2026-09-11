@@ -34,7 +34,7 @@ describe("Foundry module startup feature", () => {
     expect(callbacks.has("init")).toBe(true);
 
     callbacks.get("init")?.();
-    expect(register).toHaveBeenCalledTimes(4);
+    expect(register).toHaveBeenCalledTimes(5);
   });
 
   it("allows a LAN WebSocket only when Foundry itself uses HTTP", async () => {

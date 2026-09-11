@@ -15,8 +15,29 @@ const EnvironmentSchema = z.object({
   BRIDGE_HEARTBEAT_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   DELETE_CONFIRMATION_TTL_MS: z.coerce.number().int().positive().default(120_000),
   MAX_JSON_BODY_BYTES: z.coerce.number().int().positive().default(2 * 1024 * 1024),
-  MCP_ALLOWED_HOSTS: z.string().optional()
+  MCP_ALLOWED_HOSTS: z.string().optional(),
+  FOUNDRY_HEADLESS_ENABLED: z.enum(["true", "false"]).default("false"),
+  FOUNDRY_HEADLESS_URL: z.string().url().default("http://127.0.0.1:30000"),
+  FOUNDRY_HEADLESS_USERNAME: z.string().min(1).optional(),
+  FOUNDRY_HEADLESS_ACCESS_KEY: z.string().min(1).optional(),
+  FOUNDRY_HEADLESS_BRIDGE_URL: z.string().url().optional(),
+  FOUNDRY_HEADLESS_CHROMIUM_PATH: z.string().min(1).default("/usr/bin/chromium"),
+  FOUNDRY_HEADLESS_PROFILE_PATH: z.string().min(1).default("./data/chromium-profile"),
+  FOUNDRY_HEADLESS_RETRY_MS: z.coerce.number().int().min(1_000).default(10_000),
+  FOUNDRY_HEADLESS_BRIDGE_GRACE_MS: z.coerce.number().int().min(5_000).default(60_000)
 });
+
+export type HeadlessBrowserConfig = {
+  enabled: boolean;
+  foundryUrl: string;
+  username?: string;
+  accessKey?: string;
+  bridgeUrl: string;
+  chromiumPath: string;
+  profilePath: string;
+  retryMs: number;
+  bridgeGraceMs: number;
+};
 
 export type AppConfig = {
   nodeEnv: "development" | "test" | "production";
@@ -34,6 +55,7 @@ export type AppConfig = {
   deleteConfirmationTtlMs: number;
   maxJsonBodyBytes: number;
   allowedHosts?: string[];
+  headlessBrowser: HeadlessBrowserConfig;
 };
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -46,6 +68,17 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
   if ((value.MCP_HOST === "0.0.0.0" || value.MCP_HOST === "::") && !allowedHosts?.length) {
     throw new Error("MCP_ALLOWED_HOSTS is required when MCP_HOST listens on all interfaces");
   }
+
+  const headlessEnabled = value.FOUNDRY_HEADLESS_ENABLED === "true";
+  if (headlessEnabled && (!value.FOUNDRY_HEADLESS_USERNAME || !value.FOUNDRY_HEADLESS_ACCESS_KEY)) {
+    throw new Error("FOUNDRY_HEADLESS_USERNAME and FOUNDRY_HEADLESS_ACCESS_KEY are required when headless mode is enabled");
+  }
+  if (headlessEnabled && new URL(value.FOUNDRY_HEADLESS_URL).origin !== new URL(value.FOUNDRY_ORIGIN).origin) {
+    throw new Error("FOUNDRY_HEADLESS_URL and FOUNDRY_ORIGIN must use the same origin in headless mode");
+  }
+
+  const headlessBridgeUrl = value.FOUNDRY_HEADLESS_BRIDGE_URL
+    ?? `ws://127.0.0.1:${value.MCP_PORT}/foundry-mcp/bridge`;
 
   return {
     nodeEnv: value.NODE_ENV,
@@ -62,6 +95,17 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     bridgeHeartbeatTimeoutMs: value.BRIDGE_HEARTBEAT_TIMEOUT_MS,
     deleteConfirmationTtlMs: value.DELETE_CONFIRMATION_TTL_MS,
     maxJsonBodyBytes: value.MAX_JSON_BODY_BYTES,
-    ...(allowedHosts?.length ? { allowedHosts } : {})
+    ...(allowedHosts?.length ? { allowedHosts } : {}),
+    headlessBrowser: {
+      enabled: headlessEnabled,
+      foundryUrl: value.FOUNDRY_HEADLESS_URL,
+      ...(value.FOUNDRY_HEADLESS_USERNAME ? { username: value.FOUNDRY_HEADLESS_USERNAME } : {}),
+      ...(value.FOUNDRY_HEADLESS_ACCESS_KEY ? { accessKey: value.FOUNDRY_HEADLESS_ACCESS_KEY } : {}),
+      bridgeUrl: headlessBridgeUrl,
+      chromiumPath: value.FOUNDRY_HEADLESS_CHROMIUM_PATH,
+      profilePath: value.FOUNDRY_HEADLESS_PROFILE_PATH,
+      retryMs: value.FOUNDRY_HEADLESS_RETRY_MS,
+      bridgeGraceMs: value.FOUNDRY_HEADLESS_BRIDGE_GRACE_MS
+    }
   };
 }

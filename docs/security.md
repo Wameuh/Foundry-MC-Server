@@ -7,3 +7,10 @@ Le secret du pont est conservé dans un réglage Foundry réservé au GM et de p
 Les opérations de création et modification passent par les API publiques Foundry. Les suppressions utilisent `foundry_prepare_delete`, puis `foundry_confirm_delete` avec un jeton à usage unique et expiration courte.
 
 Le projet n’expose ni `eval`, ni JavaScript arbitraire, ni accès à la base Foundry, ni clics automatisés Plutonium. Les secrets et le contenu complet des fiches sont exclus des journaux.
+
+En mode headless, la clé d'accès du compte GM technique est fournie uniquement
+par `FOUNDRY_HEADLESS_ACCESS_KEY`. Le fichier `.env` doit être limité au compte
+de service (`chmod 600 .env`). Le navigateur utilise le formulaire de connexion
+Foundry normal ; aucune route d'authentification privée n'est appelée
+directement. Utiliser un compte dédié évite de partager les identifiants du GM
+habituel.

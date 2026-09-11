@@ -6,5 +6,7 @@
   "FOUNDRY_MCP.Settings.Notifications.Name": "Afficher les notifications",
   "FOUNDRY_MCP.Settings.Notifications.Hint": "Afficher une notification après les opérations de modification.",
   "FOUNDRY_MCP.Settings.Diagnostics.Name": "Journal de diagnostic",
-  "FOUNDRY_MCP.Settings.Diagnostics.Hint": "Journaliser la connexion sans inclure les secrets ni les données manipulées."
+  "FOUNDRY_MCP.Settings.Diagnostics.Hint": "Journaliser la connexion sans inclure les secrets ni les données manipulées.",
+  "FOUNDRY_MCP.Settings.AssistantSetup.Name": "Proposer la création du compte assistant",
+  "FOUNDRY_MCP.Settings.AssistantSetup.Hint": "Lors de la prochaine connexion d’un MJ complet, proposer la création du compte MCP headless dédié. Désactivé après création ou refus."
 }

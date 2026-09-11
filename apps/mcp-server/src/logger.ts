@@ -11,8 +11,10 @@ export function createLogger(config: Pick<AppConfig, "logLevel">): Logger {
         "authorization",
         "token",
         "secret",
+        "accessKey",
         "bridgeSecret",
         "mcpBearerToken",
+        "headlessBrowser.accessKey",
         "payload.entries[*].data",
         "payload.biography",
         "payload.description"

@@ -66,7 +66,19 @@ docker compose -f deploy/compose.example.yaml logs --tail=100 foundry-mcp
 Le port `3210` reste lié à `127.0.0.1`. Configurer ensuite le reverse proxy
 HTTPS/WSS avec l'exemple `deploy/nginx/foundry-mcp.example.conf`.
 
-## 3. Configurer le module Foundry
+## 3. Configurer la session Foundry
+
+Pour une session GM automatique exécutée par le serveur MCP, suivre les
+commandes de [Session Foundry GM automatique](headless-foundry.md). C'est le
+mode recommandé lorsque Foundry et le serveur MCP partagent la même machine.
+Après l'installation ou la mise à jour du module, recharger le monde avec un
+GM complet, confirmer **Créer l'assistant**, puis conserver le bloc `.env`
+affiché avant de fermer la fenêtre.
+
+Pour conserver une session GM ouverte manuellement, configurer le module comme
+suit.
+
+### Session manuelle
 
 Dans **Configuration du jeu → Configurer les paramètres → Paramètres du module**,
 renseigner :
@@ -111,14 +123,14 @@ publiée ou pour tester une modification locale :
 ```sh
 npm ci
 npm run package:module
-unzip -l artifacts/foundry-mcp-bridge-0.1.1.zip
+unzip -l artifacts/foundry-mcp-bridge-0.2.0.zip
 ```
 
 Extraire ensuite l'archive dans le répertoire de données Foundry :
 
 ```sh
 mkdir -p /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
-unzip artifacts/foundry-mcp-bridge-0.1.1.zip \
+unzip artifacts/foundry-mcp-bridge-0.2.0.zip \
   -d /chemin/vers/FoundryVTT/Data/modules/foundry-mcp-bridge
 ```
 

@@ -6,5 +6,7 @@
   "FOUNDRY_MCP.Settings.Notifications.Name": "Show notifications",
   "FOUNDRY_MCP.Settings.Notifications.Hint": "Show a Foundry notification after mutating operations.",
   "FOUNDRY_MCP.Settings.Diagnostics.Name": "Diagnostic logging",
-  "FOUNDRY_MCP.Settings.Diagnostics.Hint": "Log connection diagnostics. Secrets and payloads are never logged."
+  "FOUNDRY_MCP.Settings.Diagnostics.Hint": "Log connection diagnostics. Secrets and payloads are never logged.",
+  "FOUNDRY_MCP.Settings.AssistantSetup.Name": "Offer assistant account setup",
+  "FOUNDRY_MCP.Settings.AssistantSetup.Hint": "On the next full-GM login, offer to create the dedicated headless MCP user. Disable this after creation or dismissal."
 }

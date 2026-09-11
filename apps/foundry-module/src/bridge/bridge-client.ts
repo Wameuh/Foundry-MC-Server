@@ -126,7 +126,7 @@ export class BridgeClient {
 function createRegistration(): BridgeRegistration {
   const plutonium = getPlutoniumCapabilities();
   return {
-    bridgeVersion: "0.1.1",
+    bridgeVersion: "0.2.0",
     world: { id: game.world?.id ?? "", title: game.world?.title ?? "" },
     user: { id: game.user?.id ?? "", name: game.user?.name ?? "", isGM: true },
     foundry: { version: game.version },

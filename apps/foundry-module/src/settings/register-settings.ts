@@ -40,6 +40,14 @@ const SETTINGS: Setting[] = [
     type: Boolean,
     default: false,
   },
+  {
+    key: "offerAssistantSetup",
+    name: "FOUNDRY_MCP.Settings.AssistantSetup.Name",
+    hint: "FOUNDRY_MCP.Settings.AssistantSetup.Hint",
+    type: Boolean,
+    default: true,
+    scope: "world",
+  },
 ];
 
 export function registerSettings(): void {

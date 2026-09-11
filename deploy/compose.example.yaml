@@ -8,6 +8,9 @@ services:
       MCP_HOST: 0.0.0.0
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1}
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: "1gb"
     ports:
       - "127.0.0.1:3210:3210"
     volumes:
