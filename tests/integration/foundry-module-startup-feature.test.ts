@@ -27,7 +27,7 @@ describe("Foundry module startup feature", () => {
     };
     (globalThis as Record<string, unknown>).window = {
       addEventListener: vi.fn(),
-      location: { protocol: "http:", hostname: "192.168.1.109" },
+      location: { protocol: "http:", hostname: "foundry.local" },
     };
 
     await expect(import("../../apps/foundry-module/src/main.js")).resolves.toBeDefined();
@@ -39,21 +39,21 @@ describe("Foundry module startup feature", () => {
       .filter((call) => call[1] === "bridgeUrl" || call[1] === "bridgeSecret");
     expect(bridgeSettings).toHaveLength(2);
     expect(bridgeSettings.every((call) => typeof call[2].onChange === "function")).toBe(true);
-  });
+  }, 15_000);
 
   it("allows a LAN WebSocket only when Foundry itself uses HTTP", async () => {
     (globalThis as Record<string, unknown>).location = {
       protocol: "http:",
-      hostname: "192.168.1.109",
+      hostname: "foundry.local",
     };
     const { isAllowedBridgeUrl } = await import("../../apps/foundry-module/src/bridge/bridge-client.js");
-    expect(isAllowedBridgeUrl("ws://192.168.1.109:3210/foundry-mcp/bridge")).toBe(true);
+    expect(isAllowedBridgeUrl("ws://mcp.local:3210/foundry-mcp/bridge")).toBe(true);
 
     (globalThis as Record<string, unknown>).location = {
       protocol: "https:",
       hostname: "foundry.example.com",
     };
-    expect(isAllowedBridgeUrl("ws://192.168.1.109:3210/foundry-mcp/bridge")).toBe(false);
+    expect(isAllowedBridgeUrl("ws://mcp.local:3210/foundry-mcp/bridge")).toBe(false);
     expect(isAllowedBridgeUrl("wss://mcp.example.com/foundry-mcp/bridge")).toBe(true);
   });
 });

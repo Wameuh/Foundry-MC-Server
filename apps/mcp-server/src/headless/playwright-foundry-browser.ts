@@ -1,11 +1,12 @@
 import { mkdir } from "node:fs/promises";
 
-import { chromium, type BrowserContext, type Page } from "playwright-core";
+import { chromium, type BrowserContext, type Locator, type Page } from "playwright-core";
 
 import type { HeadlessBrowserConfig } from "../config.js";
 import type { FoundryBrowserSession, FoundryClientState } from "./types.js";
 
 const MODULE_ID = "foundry-mcp-bridge";
+const LOGIN_TIMEOUT_MS = 30_000;
 
 export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
   private context: BrowserContext | undefined;
@@ -28,12 +29,45 @@ export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
 
   async login(username: string, accessKey: string): Promise<void> {
     const page = this.requirePage();
-    const form = page.locator('form[name="join"]');
-    await form.waitFor({ state: "visible" });
-    await form.locator('input[name="username"]').fill(username);
-    await form.locator('input[name="password"]').fill(accessKey);
-    await form.locator('button[name="join"]').click();
-    await page.waitForURL((url) => url.pathname.endsWith("/game"), { timeout: 30_000 });
+    const formSelector = 'form#join-form:visible, form[name="join"]:visible';
+    const form = page.locator(formSelector).first();
+    await waitForVisible(form, LOGIN_TIMEOUT_MS, "Foundry join form", page);
+
+    // Foundry v14.367 uses a username text field. Earlier v14 builds and
+    // customized join pages can expose the same field as a select instead.
+    const usernameInput = form.locator(
+      'input[name="username"]:visible, input#join-username:visible, input[name="userid"]:visible'
+    ).first();
+    if (await usernameInput.count() > 0) {
+      await usernameInput.fill(username);
+    } else {
+      const userSelect = form.locator(
+        'select[name="username"]:visible, select#join-username:visible, select[name="userid"]:visible, select#userid:visible'
+      ).first();
+      await waitForVisible(userSelect, LOGIN_TIMEOUT_MS, "Foundry user selector", page);
+      try {
+        await userSelect.selectOption({ label: username }, { timeout: 5_000 });
+      } catch {
+        const matchingOption = userSelect.locator("option").filter({ hasText: username }).first();
+        if (await matchingOption.count() === 0) {
+          throw new Error(`Foundry user selector did not contain the requested user (${await pageDiagnostics(page)})`);
+        }
+        const value = await matchingOption.getAttribute("value");
+        if (value === null) {
+          throw new Error(`Foundry user selector option was not selectable (${await pageDiagnostics(page)})`);
+        }
+        await userSelect.selectOption({ value });
+      }
+    }
+
+    const password = form.locator('input[name="password"]:visible, input[type="password"]:visible').first();
+    await waitForVisible(password, LOGIN_TIMEOUT_MS, "Foundry password field", page);
+    await password.fill(accessKey);
+
+    const joinButton = form.locator('button[name="join"]:visible, button[type="submit"]:visible, input[type="submit"]:visible').first();
+    await waitForVisible(joinButton, LOGIN_TIMEOUT_MS, "Foundry join button", page);
+    await joinButton.click();
+    await page.waitForURL((url) => url.pathname.endsWith("/game"), { timeout: LOGIN_TIMEOUT_MS });
   }
 
   async waitForFoundry(): Promise<FoundryClientState> {
@@ -88,6 +122,20 @@ export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
     if (!this.page) throw new Error("The Foundry browser is not open");
     return this.page;
   }
+}
+
+async function waitForVisible(locator: Locator, timeout: number, element: string, page: Page): Promise<void> {
+  try {
+    await locator.waitFor({ state: "visible", timeout });
+  } catch {
+    throw new Error(`${element} was not visible within ${timeout}ms (${await pageDiagnostics(page)})`);
+  }
+}
+
+async function pageDiagnostics(page: Page): Promise<string> {
+  const selectors = ['form#join-form', 'form[name="join"]', 'input[name="username"]', 'select[name="username"]', 'select[name="userid"]', 'input[name="password"]', 'button[name="join"]'];
+  const counts = await Promise.all(selectors.map(async (selector) => `${selector}=${await page.locator(selector).count()}`));
+  return `url=${new URL(page.url()).pathname}; ${counts.join(", ")}`;
 }
 
 function route(baseUrl: string, name: string): string {
