@@ -84,6 +84,9 @@ du pont, jamais le jeton MCP.
 
 Lorsque Foundry et le serveur MCP partagent la même machine, le serveur peut
 superviser un Chromium headless et réauthentifier le compte `MCP Bridge GM`.
+Il s'agit d'un utilisateur Foundry doté du rôle Gamemaster, pas d'un compte du
+système d'exploitation ni d'un client MCP. Il est requis pour le mode headless,
+mais pas lorsqu'un navigateur GM est maintenu ouvert manuellement.
 Les variables, commandes Docker et états de diagnostic sont détaillés dans
 [Session Foundry GM automatique](headless-foundry.md). Le chargement du monde
 dispose par défaut de cinq minutes, réglables avec

@@ -28,7 +28,7 @@ que le WebSocket du module reste entièrement dans le conteneur.
 Depuis la racine du dépôt :
 
 ```sh
-cp .env.example .env
+test -f .env || cp .env.example .env
 chmod 600 .env
 
 sed -i 's|^FOUNDRY_ORIGIN=.*|FOUNDRY_ORIGIN=http://host.docker.internal:30000|' .env
@@ -37,6 +37,10 @@ sed -i 's|^FOUNDRY_HEADLESS_URL=.*|FOUNDRY_HEADLESS_URL=http://host.docker.inter
 sed -i 's|^FOUNDRY_HEADLESS_BRIDGE_URL=.*|FOUNDRY_HEADLESS_BRIDGE_URL=ws://127.0.0.1:3210/foundry-mcp/bridge|' .env
 sed -i 's|^FOUNDRY_HEADLESS_USERNAME=.*|FOUNDRY_HEADLESS_USERNAME=MCP Bridge GM|' .env
 ```
+
+Cette commande ne remplace pas une configuration existante. Si
+`docs/installation.md` a déjà été suivi, conserver ses secrets et modifier
+uniquement les variables `FOUNDRY_HEADLESS_*` et `FOUNDRY_ORIGIN`.
 
 Si le bloc généré n'a pas été copié directement, saisir la clé sans la conserver
 dans l'historique du shell :

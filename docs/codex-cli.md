@@ -3,15 +3,23 @@
 Codex utilise le transport MCP Streamable HTTP du serveur. Le jeton reste dans
 une variable d'environnement et n'est pas écrit directement dans `config.toml`.
 
-## Ajouter le serveur
+## Ajouter le serveur sur le même hôte
+
+Lorsque Codex, le serveur MCP et Foundry s'exécutent sur le même hôte — y
+compris avec Codex Desktop connecté à un projet distant — utiliser l'adresse
+locale :
 
 ```sh
 export MCP_BEARER_TOKEN="copier-la-valeur-MCP_BEARER_TOKEN-du-serveur"
 codex mcp add foundry \
-  --url https://mcp.example.com/mcp \
+  --url http://127.0.0.1:3210/mcp \
   --bearer-token-env-var MCP_BEARER_TOKEN
 codex mcp list
 ```
+
+Utiliser `https://mcp.example.com/mcp` à la place uniquement lorsque le client
+Codex se trouve sur une autre machine et que le reverse proxy HTTPS a été
+configuré.
 
 Pour rendre la variable disponible dans les prochaines sessions, l'ajouter au
 gestionnaire de secrets ou au mécanisme d'environnement utilisé pour lancer
@@ -24,7 +32,7 @@ projet peut aussi être placée dans `.codex/config.toml` pour un projet approuv
 
 ```toml
 [mcp_servers.foundry]
-url = "https://mcp.example.com/mcp"
+url = "http://127.0.0.1:3210/mcp"
 bearer_token_env_var = "MCP_BEARER_TOKEN"
 tool_timeout_sec = 180
 required = true
