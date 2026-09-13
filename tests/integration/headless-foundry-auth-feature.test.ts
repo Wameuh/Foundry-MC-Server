@@ -72,7 +72,7 @@ class FoundryV14LoginPage {
 
   locator(selector: string): FoundryV14Locator {
     this.actions.push(`locator:${selector}`);
-    if (selector !== 'form#join-form:visible, form[name="join"]:visible') {
+    if (selector !== 'form#join-game-form:visible, form#join-form:visible, form[name="join"]:visible') {
       throw new Error(`Unexpected top-level selector: ${selector}`);
     }
     return new FoundryV14Form(this, true);
@@ -177,7 +177,7 @@ describe("automated Foundry authentication feature", () => {
 
     expect(page.actions).toEqual([
       "goto:http://127.0.0.1:30000/game",
-      'locator:form#join-form:visible, form[name="join"]:visible',
+      'locator:form#join-game-form:visible, form#join-form:visible, form[name="join"]:visible',
       "wait-form:visible",
       'form-locator:input[name="username"]:visible, input#join-username:visible, input[name="userid"]:visible',
       "fill-username:MCP Bridge GM",

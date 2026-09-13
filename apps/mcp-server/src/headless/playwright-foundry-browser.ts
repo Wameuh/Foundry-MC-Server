@@ -1,4 +1,5 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
+import path from "node:path";
 
 import { chromium, type BrowserContext, type Locator, type Page } from "playwright-core";
 
@@ -7,6 +8,7 @@ import type { FoundryBrowserSession, FoundryClientState } from "./types.js";
 
 const MODULE_ID = "foundry-mcp-bridge";
 const LOGIN_TIMEOUT_MS = 30_000;
+const PROFILE_SINGLETON_FILES = ["SingletonLock", "SingletonCookie", "SingletonSocket"] as const;
 
 export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
   private context: BrowserContext | undefined;
@@ -16,11 +18,14 @@ export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
 
   async openGame(): Promise<"game" | "join"> {
     await mkdir(this.config.profilePath, { recursive: true });
+    // Docker restarts leave stale Chromium singleton locks on the mounted profile.
+    await clearStaleProfileLocks(this.config.profilePath);
     this.context = await chromium.launchPersistentContext(this.config.profilePath, {
       executablePath: this.config.chromiumPath,
       headless: true,
-      viewport: { width: 1280, height: 900 },
-      args: ["--disable-dev-shm-usage"]
+      viewport: { width: 1440, height: 900 },
+      // Docker/AppArmor often blocks the Chromium sandbox; --no-sandbox is required there.
+      args: ["--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox"]
     });
     this.page = this.context.pages()[0] ?? await this.context.newPage();
     await this.page.goto(route(this.config.foundryUrl, "game"), { waitUntil: "domcontentloaded" });
@@ -29,7 +34,7 @@ export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
 
   async login(username: string, accessKey: string): Promise<void> {
     const page = this.requirePage();
-    const formSelector = 'form#join-form:visible, form[name="join"]:visible';
+    const formSelector = 'form#join-game-form:visible, form#join-form:visible, form[name="join"]:visible';
     const form = page.locator(formSelector).first();
     await waitForVisible(form, LOGIN_TIMEOUT_MS, "Foundry join form", page);
 
@@ -133,7 +138,7 @@ async function waitForVisible(locator: Locator, timeout: number, element: string
 }
 
 async function pageDiagnostics(page: Page): Promise<string> {
-  const selectors = ['form#join-form', 'form[name="join"]', 'input[name="username"]', 'select[name="username"]', 'select[name="userid"]', 'input[name="password"]', 'button[name="join"]'];
+  const selectors = ['form#join-game-form', 'form#join-form', 'form[name="join"]', 'input[name="username"]', 'select[name="username"]', 'select[name="userid"]', 'input[name="password"]', 'button[name="join"]'];
   const counts = await Promise.all(selectors.map(async (selector) => `${selector}=${await page.locator(selector).count()}`));
   return `url=${new URL(page.url()).pathname}; ${counts.join(", ")}`;
 }
@@ -145,4 +150,10 @@ function route(baseUrl: string, name: string): string {
   base.search = "";
   base.hash = "";
   return base.toString();
+}
+
+async function clearStaleProfileLocks(profilePath: string): Promise<void> {
+  await Promise.all(
+    PROFILE_SINGLETON_FILES.map((file) => rm(path.join(profilePath, file), { force: true }))
+  );
 }
