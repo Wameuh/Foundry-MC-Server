@@ -41,6 +41,14 @@ export const BridgeRegistrationSchema = z
             compatible: z.boolean()
           })
           .strict()
+          .optional(),
+        autoanimations: z
+          .object({
+            active: z.boolean(),
+            version: z.string().trim().min(1).max(128).optional(),
+            compatible: z.boolean()
+          })
+          .strict()
           .optional()
       })
       .strict(),
@@ -67,6 +75,11 @@ export const BridgeOperation = {
   PLUTONIUM_GET_CAPABILITIES: "plutonium.getCapabilities",
   PLUTONIUM_IMPORT_REFERENCE: "plutonium.importReference",
   PLUTONIUM_IMPORT_ENTRIES: "plutonium.importEntries",
+  AUTOANIMATIONS_GET_CAPABILITIES: "autoanimations.getCapabilities",
+  AUTOANIMATIONS_GET_ITEM: "autoanimations.getItemAnimation",
+  AUTOANIMATIONS_SET_ITEM: "autoanimations.setItemAnimation",
+  AUTOANIMATIONS_GET_AUTOREC: "autoanimations.getAutorec",
+  AUTOANIMATIONS_SEARCH_CATALOG: "autoanimations.searchCatalog",
   PREPARE_DELETE: "foundry.prepareDelete",
   CONFIRM_DELETE: "foundry.confirmDelete"
 } as const;

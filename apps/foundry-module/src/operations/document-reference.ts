@@ -10,7 +10,7 @@ export function toDocumentReference(document: FoundryDocument): DocumentReferenc
   };
 }
 
-export function emptyReceipt(operationId: string, provider: "foundry" | "plutonium" = "foundry") {
+export function emptyReceipt(operationId: string, provider: "foundry" | "plutonium" | "autoanimations" = "foundry") {
   return {
     operationId,
     status: "completed" as const,

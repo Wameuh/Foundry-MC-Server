@@ -4,6 +4,7 @@ import { dispatchRequest } from "./dispatcher";
 import { Heartbeat } from "./heartbeat";
 import { ReconnectBackoff } from "./reconnect";
 import { readSettings, type BridgeSettings } from "../settings/read-settings";
+import { getAutoAnimationsCapabilities } from "../integrations/autoanimations/capability-probe";
 import { getPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
 
 type ServerMessage =
@@ -126,6 +127,7 @@ export class BridgeClient {
 
 function createRegistration(): BridgeRegistration {
   const plutonium = getPlutoniumCapabilities();
+  const autoanimations = getAutoAnimationsCapabilities();
   return {
     bridgeVersion: APPLICATION_VERSION,
     world: { id: game.world?.id ?? "", title: game.world?.title ?? "" },
@@ -137,6 +139,11 @@ function createRegistration(): BridgeRegistration {
         active: plutonium.active,
         ...(plutonium.version ? { version: plutonium.version } : {}),
         compatible: plutonium.compatible,
+      },
+      autoanimations: {
+        active: autoanimations.active,
+        ...(autoanimations.version ? { version: autoanimations.version } : {}),
+        compatible: autoanimations.compatible,
       },
     },
     capabilities: [
@@ -155,6 +162,11 @@ function createRegistration(): BridgeRegistration {
       "plutonium.capabilities",
       ...(plutonium.importJson ? ["plutonium.import.json"] : []),
       ...(plutonium.importReference ? ["plutonium.import.reference"] : []),
+      "autoanimations.capabilities",
+      ...(autoanimations.itemRead ? ["autoanimations.item.read"] : []),
+      ...(autoanimations.itemWrite ? ["autoanimations.item.write"] : []),
+      ...(autoanimations.autorecRead ? ["autoanimations.autorec.read"] : []),
+      ...(autoanimations.catalogSearch ? ["autoanimations.catalog.search"] : []),
     ],
   };
 }

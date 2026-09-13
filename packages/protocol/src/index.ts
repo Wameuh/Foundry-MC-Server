@@ -11,3 +11,4 @@ export * from "./schemas/dnd5e.js";
 export * from "./schemas/documents.js";
 export * from "./schemas/embedded-documents.js";
 export * from "./schemas/plutonium.js";
+export * from "./schemas/autoanimations.js";

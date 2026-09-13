@@ -11,7 +11,7 @@ export type AuditEvent = {
   tool: string;
   worldId?: string;
   userId?: string;
-  provider?: "foundry" | "plutonium";
+  provider?: "foundry" | "plutonium" | "autoanimations";
   targets?: unknown[];
   status: "completed" | "partial" | "skipped" | "failed";
   durationMs: number;

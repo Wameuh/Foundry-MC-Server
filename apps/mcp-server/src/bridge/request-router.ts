@@ -77,7 +77,7 @@ export class RequestRouter {
         tool: options.tool ?? operation,
         worldId: session.worldId,
         userId: session.userId,
-        provider: operation.startsWith("plutonium.") ? "plutonium" : "foundry",
+        provider: providerForOperation(operation),
         status: "failed",
         durationMs: Date.now() - startedAt,
         errorCode: code
@@ -99,7 +99,10 @@ export class RequestRouter {
     const status = result && ["completed", "partial", "skipped", "failed"].includes(String(result["status"]))
       ? (result["status"] as "completed" | "partial" | "skipped" | "failed")
       : "completed";
-    const provider = result?.["provider"] === "plutonium" ? "plutonium" : "foundry";
+    const provider =
+      result?.["provider"] === "plutonium" || result?.["provider"] === "autoanimations"
+        ? result["provider"]
+        : "foundry";
     const targetCandidates = [result?.["created"], result?.["updated"], result?.["deleted"], result?.["targets"]]
       .filter(Array.isArray)
       .flat();
@@ -123,6 +126,12 @@ export class RequestRouter {
     const now = Date.now();
     for (const [key, value] of this.idempotency) if (value.expiresAt <= now) this.idempotency.delete(key);
   }
+}
+
+function providerForOperation(operation: BridgeOperationValue): "foundry" | "plutonium" | "autoanimations" {
+  if (operation.startsWith("plutonium.")) return "plutonium";
+  if (operation.startsWith("autoanimations.")) return "autoanimations";
+  return "foundry";
 }
 
 function summarizeTarget(value: unknown): Record<string, string> | undefined {
