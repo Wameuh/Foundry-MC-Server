@@ -7,6 +7,8 @@ services:
     environment:
       MCP_HOST: 0.0.0.0
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      # Chromium's sandbox is often unusable in containers; opt in explicitly here.
+      FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX: ${FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX:-true}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

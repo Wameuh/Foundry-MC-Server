@@ -8,12 +8,17 @@ import type { HeadlessBrowserConfig } from "../../apps/mcp-server/src/config.js"
 import { computeBridgeHmac } from "../../apps/mcp-server/src/bridge/authentication.js";
 import { createChallengeHmac } from "../../apps/foundry-module/src/bridge/authenticate.js";
 import { prepareFoundrySession } from "../../apps/mcp-server/src/headless/prepare-foundry-session.js";
-import { PlaywrightFoundryBrowser } from "../../apps/mcp-server/src/headless/playwright-foundry-browser.js";
+import {
+  FOUNDRY_V14_JOIN_FORM_SELECTOR,
+  PlaywrightFoundryBrowser
+} from "../../apps/mcp-server/src/headless/playwright-foundry-browser.js";
 import { chromium } from "playwright-core";
 import type {
   FoundryBrowserSession,
   FoundryClientState
 } from "../../apps/mcp-server/src/headless/types.js";
+import type { ChromiumProfileLockDeps } from "../../apps/mcp-server/src/headless/chromium-profile-lock.js";
+import { FOUNDRY_V14_JOIN_GAME_FORM_FIXTURE } from "../helpers/foundry-v14-join-form-fixture.js";
 
 const config: HeadlessBrowserConfig = {
   enabled: true,
@@ -23,10 +28,25 @@ const config: HeadlessBrowserConfig = {
   bridgeUrl: "ws://127.0.0.1:3210/foundry-mcp/bridge",
   chromiumPath: "/usr/bin/chromium",
   profilePath: "/tmp/foundry-mcp-test-profile",
+  chromiumNoSandbox: false,
   readyTimeoutMs: 300_000,
   retryMs: 10_000,
   bridgeGraceMs: 60_000
 };
+
+function noopProfileLock(): ChromiumProfileLockDeps {
+  return {
+    resolveProfilePath: (profilePath) => profilePath,
+    readSingletonLock: async () => undefined,
+    listChromiumPidsUsingProfile: async () => [],
+    isProcessAlive: () => false,
+    signalProcess() {},
+    removeSingletonFiles: async () => undefined,
+    hostname: () => "test-host",
+    now: () => Date.now(),
+    sleep: async () => undefined
+  };
+}
 
 class FeatureBrowser implements FoundryBrowserSession {
   readonly calls: string[] = [];
@@ -61,6 +81,8 @@ class FoundryV14LoginPage {
   readonly actions: string[] = [];
   private currentUrl = "http://127.0.0.1:30000/game";
 
+  constructor(private readonly mode: "text-username" | "select-userid" = "text-username") {}
+
   async goto(url: string): Promise<void> {
     this.actions.push(`goto:${url}`);
     this.currentUrl = "http://127.0.0.1:30000/join";
@@ -72,10 +94,10 @@ class FoundryV14LoginPage {
 
   locator(selector: string): FoundryV14Locator {
     this.actions.push(`locator:${selector}`);
-    if (selector !== 'form#join-game-form:visible, form#join-form:visible, form[name="join"]:visible') {
+    if (selector !== FOUNDRY_V14_JOIN_FORM_SELECTOR) {
       throw new Error(`Unexpected top-level selector: ${selector}`);
     }
-    return new FoundryV14Form(this, true);
+    return new FoundryV14Form(this, true, this.mode);
   }
 
   async waitForURL(predicate: (url: URL) => boolean): Promise<void> {
@@ -97,12 +119,15 @@ interface FoundryV14Locator {
   selectOption(option: { label: string } | { value: string }, options?: { timeout?: number }): Promise<void>;
   fill(value: string): Promise<void>;
   click(): Promise<void>;
+  filter?(options: { hasText: string }): FoundryV14Locator;
+  getAttribute?(name: string): Promise<string | null>;
 }
 
 class FoundryV14Form implements FoundryV14Locator {
   constructor(
     protected readonly page: FoundryV14LoginPage,
-    private readonly present: boolean
+    private readonly present: boolean,
+    private readonly mode: "text-username" | "select-userid"
   ) {}
 
   first(): FoundryV14Locator { return this; }
@@ -114,8 +139,12 @@ class FoundryV14Form implements FoundryV14Locator {
 
   locator(selector: string): FoundryV14Locator {
     this.page.actions.push(`form-locator:${selector}`);
-    if (selector.startsWith('input[name="username"]')) return new FoundryV14Username(this.page, true);
-    if (selector.startsWith('select[name="username"]')) return new FoundryV14Username(this.page, false);
+    if (selector.startsWith('input[name="username"]')) {
+      return new FoundryV14Username(this.page, this.mode === "text-username");
+    }
+    if (selector.startsWith('select[name="username"]')) {
+      return new FoundryV14UserSelect(this.page, this.mode === "select-userid");
+    }
     if (selector.startsWith('input[name="password"]')) return new FoundryV14Password(this.page, true);
     if (selector.startsWith('button[name="join"]')) return new FoundryV14JoinButton(this.page, true);
     throw new Error(`Unexpected form selector: ${selector}`);
@@ -127,6 +156,10 @@ class FoundryV14Form implements FoundryV14Locator {
 }
 
 class FoundryV14Username extends FoundryV14Form {
+  constructor(page: FoundryV14LoginPage, private readonly available: boolean) {
+    super(page, available, "text-username");
+  }
+  async count(): Promise<number> { return this.available ? 1 : 0; }
   async waitFor(): Promise<void> {}
   locator(): FoundryV14Locator { throw new Error("Unexpected nested selector"); }
   async selectOption(): Promise<void> { throw new Error("selectOption called on username input"); }
@@ -135,6 +168,49 @@ class FoundryV14Username extends FoundryV14Form {
     this.page.actions.push("fill-username:MCP Bridge GM");
   }
   async click(): Promise<void> { throw new Error("click called on username input"); }
+}
+
+class FoundryV14UserSelect extends FoundryV14Form {
+  constructor(page: FoundryV14LoginPage, private readonly available: boolean) {
+    super(page, available, "select-userid");
+  }
+  async count(): Promise<number> { return this.available ? 1 : 0; }
+  async waitFor(options: { state: "visible" }): Promise<void> {
+    this.page.actions.push(`wait-select:${options.state}`);
+  }
+  locator(selector: string): FoundryV14Locator {
+    this.page.actions.push(`select-locator:${selector}`);
+    if (selector === "option") return new FoundryV14Option(this.page);
+    throw new Error(`Unexpected select nested selector: ${selector}`);
+  }
+  async selectOption(option: { label: string } | { value: string }): Promise<void> {
+    if ("label" in option) {
+      this.page.actions.push(`select-label:${option.label}`);
+      return;
+    }
+    this.page.actions.push(`select-value:${option.value}`);
+  }
+  async fill(): Promise<void> { throw new Error("fill called on user select"); }
+  async click(): Promise<void> { throw new Error("click called on user select"); }
+}
+
+class FoundryV14Option implements FoundryV14Locator {
+  constructor(private readonly page: FoundryV14LoginPage) {}
+  first(): FoundryV14Locator { return this; }
+  async count(): Promise<number> { return 1; }
+  async waitFor(): Promise<void> {}
+  locator(): FoundryV14Locator { throw new Error("Unexpected option nested selector"); }
+  filter(options: { hasText: string }): FoundryV14Locator {
+    this.page.actions.push(`filter-option:${options.hasText}`);
+    return this;
+  }
+  async getAttribute(name: string): Promise<string | null> {
+    expect(name).toBe("value");
+    return "mcp-id";
+  }
+  async selectOption(): Promise<void> { throw new Error("selectOption called on option"); }
+  async fill(): Promise<void> { throw new Error("fill called on option"); }
+  async click(): Promise<void> { throw new Error("click called on option"); }
 }
 
 class FoundryV14Password extends FoundryV14Form {
@@ -160,10 +236,99 @@ class FoundryV14JoinButton extends FoundryV14Form {
 }
 
 describe("automated Foundry authentication feature", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(chromium.launchPersistentContext).mockReset();
+  });
+
+  it("documents Foundry 14 ApplicationV2 join-game-form used by the certified 14.367 target", () => {
+    expect(FOUNDRY_V14_JOIN_GAME_FORM_FIXTURE).toContain('id="join-game-form"');
+    expect(FOUNDRY_V14_JOIN_GAME_FORM_FIXTURE).toContain('name="userid"');
+    expect(FOUNDRY_V14_JOIN_FORM_SELECTOR).toContain("form#join-game-form");
+  });
+
+  it("launches Chromium with the sandbox enabled by default", async () => {
+    const page = new FoundryV14LoginPage();
+    const context = { pages: () => [page], newPage: async () => page, close: async () => undefined };
+    vi.mocked(chromium.launchPersistentContext).mockResolvedValue(context as never);
+
+    const browser = new PlaywrightFoundryBrowser(config, {
+      profileLock: noopProfileLock(),
+      launchPersistentContext: chromium.launchPersistentContext
+    });
+    await browser.openGame();
+
+    expect(chromium.launchPersistentContext).toHaveBeenCalledWith(
+      config.profilePath,
+      expect.objectContaining({
+        args: ["--disable-dev-shm-usage"]
+      })
+    );
+    expect(vi.mocked(chromium.launchPersistentContext).mock.calls[0]?.[1]?.args).not.toContain("--no-sandbox");
+    await browser.close();
+  });
+
+  it("adds --no-sandbox only when explicitly configured", async () => {
+    const page = new FoundryV14LoginPage();
+    const context = { pages: () => [page], newPage: async () => page, close: async () => undefined };
+    vi.mocked(chromium.launchPersistentContext).mockResolvedValue(context as never);
+
+    const browser = new PlaywrightFoundryBrowser(
+      { ...config, chromiumNoSandbox: true },
+      { profileLock: noopProfileLock(), launchPersistentContext: chromium.launchPersistentContext }
+    );
+    await browser.openGame();
+
+    expect(vi.mocked(chromium.launchPersistentContext).mock.calls[0]?.[1]?.args).toEqual([
+      "--disable-dev-shm-usage",
+      "--no-sandbox",
+      "--disable-setuid-sandbox"
+    ]);
+    await browser.close();
+  });
+
+  it("retries once without the sandbox when chromiumNoSandbox is auto", async () => {
+    const page = new FoundryV14LoginPage();
+    const context = { pages: () => [page], newPage: async () => page, close: async () => undefined };
+    vi.mocked(chromium.launchPersistentContext)
+      .mockRejectedValueOnce(new Error("No usable sandbox! Try using --no-sandbox."))
+      .mockResolvedValueOnce(context as never);
+
+    const browser = new PlaywrightFoundryBrowser(
+      { ...config, chromiumNoSandbox: "auto" },
+      { profileLock: noopProfileLock(), launchPersistentContext: chromium.launchPersistentContext }
+    );
+    await browser.openGame();
+
+    expect(chromium.launchPersistentContext).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(chromium.launchPersistentContext).mock.calls[0]?.[1]?.args).toEqual(["--disable-dev-shm-usage"]);
+    expect(vi.mocked(chromium.launchPersistentContext).mock.calls[1]?.[1]?.args).toContain("--no-sandbox");
+    await browser.close();
+  });
+
+  it("runs profile lock preparation before launching Chromium", async () => {
+    const page = new FoundryV14LoginPage();
+    const context = { pages: () => [page], newPage: async () => page, close: async () => undefined };
+    vi.mocked(chromium.launchPersistentContext).mockResolvedValue(context as never);
+    const order: string[] = [];
+    const profileLock = noopProfileLock();
+    profileLock.removeSingletonFiles = async () => {
+      order.push("clear-locks");
+    };
+    const launch = vi.fn(async (...args: Parameters<typeof chromium.launchPersistentContext>) => {
+      order.push("launch");
+      return chromium.launchPersistentContext(...args);
+    });
+
+    const browser = new PlaywrightFoundryBrowser(config, { profileLock, launchPersistentContext: launch });
+    await browser.openGame();
+
+    expect(order).toEqual(["clear-locks", "launch"]);
+    await browser.close();
+  });
 
   it("completes the Foundry v14 join form and reaches the game", async () => {
-    const page = new FoundryV14LoginPage();
+    const page = new FoundryV14LoginPage("text-username");
     const context = {
       pages: () => [page],
       newPage: async () => page,
@@ -171,13 +336,16 @@ describe("automated Foundry authentication feature", () => {
     };
     vi.mocked(chromium.launchPersistentContext).mockResolvedValue(context as never);
 
-    const browser = new PlaywrightFoundryBrowser(config);
+    const browser = new PlaywrightFoundryBrowser(config, {
+      profileLock: noopProfileLock(),
+      launchPersistentContext: chromium.launchPersistentContext
+    });
     expect(await browser.openGame()).toBe("join");
-    await browser.login(config.username, config.accessKey);
+    await browser.login(config.username!, config.accessKey!);
 
     expect(page.actions).toEqual([
       "goto:http://127.0.0.1:30000/game",
-      'locator:form#join-game-form:visible, form#join-form:visible, form[name="join"]:visible',
+      `locator:${FOUNDRY_V14_JOIN_FORM_SELECTOR}`,
       "wait-form:visible",
       'form-locator:input[name="username"]:visible, input#join-username:visible, input[name="userid"]:visible',
       "fill-username:MCP Bridge GM",
@@ -187,6 +355,31 @@ describe("automated Foundry authentication feature", () => {
       "click-join",
       "wait-for-url:/game"
     ]);
+    await browser.close();
+  });
+
+  it("falls back to the Foundry v14 userid <select> when no username input exists", async () => {
+    const page = new FoundryV14LoginPage("select-userid");
+    const context = {
+      pages: () => [page],
+      newPage: async () => page,
+      close: async () => undefined
+    };
+    vi.mocked(chromium.launchPersistentContext).mockResolvedValue(context as never);
+
+    const browser = new PlaywrightFoundryBrowser(config, {
+      profileLock: noopProfileLock(),
+      launchPersistentContext: chromium.launchPersistentContext
+    });
+    expect(await browser.openGame()).toBe("join");
+    await browser.login(config.username!, config.accessKey!);
+
+    expect(page.actions).toContainEqual(
+      'form-locator:select[name="username"]:visible, select#join-username:visible, select[name="userid"]:visible, select#userid:visible'
+    );
+    expect(page.actions).toContain("select-label:MCP Bridge GM");
+    expect(page.actions).toContain("fill-password");
+    expect(page.actions).toContain("click-join");
     await browser.close();
   });
 

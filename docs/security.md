@@ -14,3 +14,9 @@ de service (`chmod 600 .env`). Le navigateur utilise le formulaire de connexion
 Foundry normal ; aucune route d'authentification privée n'est appelée
 directement. Utiliser un compte dédié évite de partager les identifiants du GM
 habituel.
+
+Le sandbox Chromium reste activé par défaut. `FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX`
+ne doit être passé à `true` (ou `auto`) que lorsque l'environnement l'exige ;
+cela retire une frontière de sécurité du processus navigateur. Le nettoyage du
+profil ne signale que les Chromium liés à `FOUNDRY_HEADLESS_PROFILE_PATH`, jamais
+l'ensemble des navigateurs de la machine.

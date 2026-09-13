@@ -32,3 +32,12 @@ que Foundry a déjà marqué le monde comme prêt.
 `http://host.docker.internal:30000` pour `FOUNDRY_ORIGIN` et
 `FOUNDRY_HEADLESS_URL`. Le WebSocket interne reste sur
 `ws://127.0.0.1:3210/foundry-mcp/bridge`.
+
+**Chromium refuse de démarrer dans Docker** : le Compose d'exemple active
+`FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX=true` car le sandbox est souvent inutilisable
+sous AppArmor/conteneur. Hors Docker, laisser `false` pour conserver le sandbox.
+`auto` retente une fois sans sandbox uniquement après un échec de lancement.
+
+**`TARGET_WORLD_ID` incorrect** : l'identifiant doit correspondre à
+`game.world.id` (souvent visible via `/api/status`, champ `world`), pas au titre
+affiché du monde.

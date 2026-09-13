@@ -93,9 +93,17 @@ FOUNDRY_HEADLESS_ACCESS_KEY=une-cle-foundry-forte
 FOUNDRY_HEADLESS_BRIDGE_URL=ws://127.0.0.1:3210/foundry-mcp/bridge
 FOUNDRY_HEADLESS_CHROMIUM_PATH=/usr/bin/chromium
 FOUNDRY_HEADLESS_PROFILE_PATH=./data/chromium-profile
+FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX=false
 FOUNDRY_HEADLESS_READY_TIMEOUT_MS=300000
 FOUNDRY_HEADLESS_BRIDGE_GRACE_MS=180000
 ```
+
+`FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX` laisse le sandbox Chromium actif par
+défaut (`false`). Passer à `true` désactive cette frontière de sécurité et n'est
+justifié que lorsque l'environnement (souvent Docker/AppArmor) empêche le
+sandbox de démarrer. La valeur `auto` tente d'abord le lancement sandboxed, puis
+retente une seule fois avec `--no-sandbox` en cas d'échec lié au sandbox. Le
+Compose d'exemple force `true` dans le conteneur.
 
 Démarrer ensuite le serveur :
 
@@ -121,8 +129,12 @@ Plutonium termine encore ses tâches asynchrones du hook `ready`.
 
 Après une expiration de session, un redémarrage de Foundry ou une déconnexion
 du pont, le navigateur est fermé puis relancé avec un délai fixe configurable.
-Le profil Chromium persiste dans `FOUNDRY_HEADLESS_PROFILE_PATH`, mais le serveur
-sait se réauthentifier lorsque le cookie n'est plus valide.
+Le profil Chromium persiste dans `FOUNDRY_HEADLESS_PROFILE_PATH`. Avant chaque
+lancement, le serveur repère uniquement les processus Chromium qui utilisent ce
+profil (`--user-data-dir`), leur envoie un signal ciblé s'ils sont encore
+présents, attend leur sortie, puis retire les fichiers singleton restants. Aucun
+`pkill chromium` large n'est utilisé. Le serveur sait aussi se réauthentifier
+lorsque le cookie n'est plus valide.
 
 Les identifiants, le secret du pont et le contenu des fiches ne sont jamais
 écrits dans les journaux.

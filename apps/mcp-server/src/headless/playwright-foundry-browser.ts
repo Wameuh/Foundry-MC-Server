@@ -1,32 +1,47 @@
-import { mkdir, rm } from "node:fs/promises";
-import path from "node:path";
+import { mkdir } from "node:fs/promises";
 
 import { chromium, type BrowserContext, type Locator, type Page } from "playwright-core";
 
 import type { HeadlessBrowserConfig } from "../config.js";
+import {
+  defaultChromiumProfileLockDeps,
+  prepareChromiumProfile,
+  type ChromiumProfileLockDeps
+} from "./chromium-profile-lock.js";
 import type { FoundryBrowserSession, FoundryClientState } from "./types.js";
 
 const MODULE_ID = "foundry-mcp-bridge";
 const LOGIN_TIMEOUT_MS = 30_000;
-const PROFILE_SINGLETON_FILES = ["SingletonLock", "SingletonCookie", "SingletonSocket"] as const;
+const BASE_CHROMIUM_ARGS = ["--disable-dev-shm-usage"] as const;
+const NO_SANDBOX_ARGS = ["--no-sandbox", "--disable-setuid-sandbox"] as const;
+
+/** Foundry VTT 14 ApplicationV2 join UI (`#join-game-form`), verified on 14.364 and targeted at certified 14.367. */
+export const FOUNDRY_V14_JOIN_FORM_SELECTOR =
+  'form#join-game-form:visible, form#join-form:visible, form[name="join"]:visible';
+
+export type PlaywrightFoundryBrowserOptions = {
+  profileLock?: ChromiumProfileLockDeps;
+  launchPersistentContext?: typeof chromium.launchPersistentContext;
+};
 
 export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
   private context: BrowserContext | undefined;
   private page: Page | undefined;
+  private readonly profileLock: ChromiumProfileLockDeps;
+  private readonly launchPersistentContext: typeof chromium.launchPersistentContext;
 
-  constructor(private readonly config: HeadlessBrowserConfig) {}
+  constructor(
+    private readonly config: HeadlessBrowserConfig,
+    options: PlaywrightFoundryBrowserOptions = {}
+  ) {
+    this.profileLock = options.profileLock ?? defaultChromiumProfileLockDeps;
+    this.launchPersistentContext = options.launchPersistentContext ?? chromium.launchPersistentContext.bind(chromium);
+  }
 
   async openGame(): Promise<"game" | "join"> {
     await mkdir(this.config.profilePath, { recursive: true });
-    // Docker restarts leave stale Chromium singleton locks on the mounted profile.
-    await clearStaleProfileLocks(this.config.profilePath);
-    this.context = await chromium.launchPersistentContext(this.config.profilePath, {
-      executablePath: this.config.chromiumPath,
-      headless: true,
-      viewport: { width: 1440, height: 900 },
-      // Docker/AppArmor often blocks the Chromium sandbox; --no-sandbox is required there.
-      args: ["--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox"]
-    });
+    await prepareChromiumProfile(this.config.profilePath, this.profileLock);
+    this.context = await this.launchWithSandboxPolicy();
     this.page = this.context.pages()[0] ?? await this.context.newPage();
     await this.page.goto(route(this.config.foundryUrl, "game"), { waitUntil: "domcontentloaded" });
     return new URL(this.page.url()).pathname.endsWith("/join") ? "join" : "game";
@@ -34,12 +49,12 @@ export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
 
   async login(username: string, accessKey: string): Promise<void> {
     const page = this.requirePage();
-    const formSelector = 'form#join-game-form:visible, form#join-form:visible, form[name="join"]:visible';
-    const form = page.locator(formSelector).first();
+    // Prefer ApplicationV2 `#join-game-form` (Foundry 14.364+/14.367), keep legacy `#join-form` / name=join fallbacks.
+    const form = page.locator(FOUNDRY_V14_JOIN_FORM_SELECTOR).first();
     await waitForVisible(form, LOGIN_TIMEOUT_MS, "Foundry join form", page);
 
-    // Foundry v14.367 uses a username text field. Earlier v14 builds and
-    // customized join pages can expose the same field as a select instead.
+    // Foundry v14.367 commonly uses a username text field. Some 14.x builds and
+    // customized join pages expose the same field as a <select name="userid"> instead.
     const usernameInput = form.locator(
       'input[name="username"]:visible, input#join-username:visible, input[name="userid"]:visible'
     ).first();
@@ -123,10 +138,40 @@ export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
     await context?.close();
   }
 
+  private async launchWithSandboxPolicy(): Promise<BrowserContext> {
+    const sandboxedArgs = [...BASE_CHROMIUM_ARGS];
+    const unsandboxedArgs = [...BASE_CHROMIUM_ARGS, ...NO_SANDBOX_ARGS];
+
+    if (this.config.chromiumNoSandbox === true) {
+      return this.launchPersistentContext(this.config.profilePath, launchOptions(this.config, unsandboxedArgs));
+    }
+
+    try {
+      return await this.launchPersistentContext(this.config.profilePath, launchOptions(this.config, sandboxedArgs));
+    } catch (error) {
+      if (this.config.chromiumNoSandbox !== "auto" || !isSandboxLaunchFailure(error)) throw error;
+      return this.launchPersistentContext(this.config.profilePath, launchOptions(this.config, unsandboxedArgs));
+    }
+  }
+
   private requirePage(): Page {
     if (!this.page) throw new Error("The Foundry browser is not open");
     return this.page;
   }
+}
+
+function launchOptions(config: HeadlessBrowserConfig, args: string[]) {
+  return {
+    executablePath: config.chromiumPath,
+    headless: true,
+    viewport: { width: 1440, height: 900 },
+    args
+  };
+}
+
+function isSandboxLaunchFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /no usable sandbox|target page, context or browser has been closed|--no-sandbox/i.test(message);
 }
 
 async function waitForVisible(locator: Locator, timeout: number, element: string, page: Page): Promise<void> {
@@ -150,10 +195,4 @@ function route(baseUrl: string, name: string): string {
   base.search = "";
   base.hash = "";
   return base.toString();
-}
-
-async function clearStaleProfileLocks(profilePath: string): Promise<void> {
-  await Promise.all(
-    PROFILE_SINGLETON_FILES.map((file) => rm(path.join(profilePath, file), { force: true }))
-  );
 }

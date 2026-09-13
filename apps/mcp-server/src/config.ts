@@ -23,6 +23,8 @@ const EnvironmentSchema = z.object({
   FOUNDRY_HEADLESS_BRIDGE_URL: z.string().url().optional(),
   FOUNDRY_HEADLESS_CHROMIUM_PATH: z.string().min(1).default("/usr/bin/chromium"),
   FOUNDRY_HEADLESS_PROFILE_PATH: z.string().min(1).default("./data/chromium-profile"),
+  // false: keep sandbox. true: always disable. auto: retry once with --no-sandbox after a sandbox launch failure.
+  FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX: z.enum(["true", "false", "auto"]).default("false"),
   FOUNDRY_HEADLESS_READY_TIMEOUT_MS: z.coerce.number().int().min(30_000).default(300_000),
   FOUNDRY_HEADLESS_RETRY_MS: z.coerce.number().int().min(1_000).default(10_000),
   FOUNDRY_HEADLESS_BRIDGE_GRACE_MS: z.coerce.number().int().min(5_000).default(180_000)
@@ -36,6 +38,7 @@ export type HeadlessBrowserConfig = {
   bridgeUrl: string;
   chromiumPath: string;
   profilePath: string;
+  chromiumNoSandbox: boolean | "auto";
   readyTimeoutMs: number;
   retryMs: number;
   bridgeGraceMs: number;
@@ -106,6 +109,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       bridgeUrl: headlessBridgeUrl,
       chromiumPath: value.FOUNDRY_HEADLESS_CHROMIUM_PATH,
       profilePath: value.FOUNDRY_HEADLESS_PROFILE_PATH,
+      chromiumNoSandbox: value.FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX === "auto"
+        ? "auto"
+        : value.FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX === "true",
       readyTimeoutMs: value.FOUNDRY_HEADLESS_READY_TIMEOUT_MS,
       retryMs: value.FOUNDRY_HEADLESS_RETRY_MS,
       bridgeGraceMs: value.FOUNDRY_HEADLESS_BRIDGE_GRACE_MS
