@@ -5,34 +5,60 @@ import {
   type ChromiumProfileLockDeps
 } from "../../apps/mcp-server/src/headless/chromium-profile-lock.js";
 
-function createDeps(overrides: Partial<ChromiumProfileLockDeps> & Pick<
-  ChromiumProfileLockDeps,
-  "listChromiumPidsUsingProfile" | "readSingletonLock" | "isProcessAlive"
->): ChromiumProfileLockDeps & { signals: Array<{ pid: number; signal: NodeJS.Signals }>; removed: boolean } {
-  const state = { signals: [] as Array<{ pid: number; signal: NodeJS.Signals }>, removed: false };
+function createMutexLock() {
+  let held = false;
+  const waiters: Array<() => void> = [];
+  return {
+    async acquire(): Promise<() => Promise<void>> {
+      if (held) {
+        await new Promise<void>((resolve) => waiters.push(resolve));
+      }
+      held = true;
+      return async () => {
+        held = false;
+        waiters.shift()?.();
+      };
+    },
+    isHeld: () => held
+  };
+}
+
+function createDeps(overrides: Partial<ChromiumProfileLockDeps> = {}): ChromiumProfileLockDeps & {
+  removed: boolean;
+  released: boolean;
+} {
+  const state = { removed: false, released: false };
+  const mutex = createMutexLock();
   return {
     resolveProfilePath: (profilePath) => profilePath,
+    readSingletonLock: async () => undefined,
+    listChromiumPidsUsingProfile: async () => [],
+    isProcessAlive: () => false,
     removeSingletonFiles: async () => {
       state.removed = true;
+    },
+    acquireInterprocessLock: async () => {
+      const release = await mutex.acquire();
+      return async () => {
+        state.released = true;
+        await release();
+      };
     },
     hostname: () => "mcp-host",
     now: (() => {
       let t = 0;
       return () => {
-        t += 200;
+        t += 50;
         return t;
       };
     })(),
     sleep: async () => undefined,
-    signalProcess(pid, signal) {
-      state.signals.push({ pid, signal });
-    },
     ...overrides,
-    get signals() {
-      return state.signals;
-    },
     get removed() {
       return state.removed;
+    },
+    get released() {
+      return state.released;
     }
   };
 }
@@ -40,34 +66,14 @@ function createDeps(overrides: Partial<ChromiumProfileLockDeps> & Pick<
 describe("chromium profile lock cleanup feature", () => {
   it("clears leftover singleton files for a stale session with no living Chromium", async () => {
     const deps = createDeps({
-      listChromiumPidsUsingProfile: async () => [],
       readSingletonLock: async () => ({ hostname: "old-container", pid: 21335 }),
       isProcessAlive: () => false
     });
 
-    await prepareChromiumProfile("/app/data/chromium-profile", deps);
-
-    expect(deps.signals).toEqual([]);
+    const preparation = await prepareChromiumProfile("/app/data/chromium-profile", deps);
     expect(deps.removed).toBe(true);
-  });
-
-  it("terminates only the Chromium PID that still uses this MCP profile, then clears locks", async () => {
-    const alive = new Set([4242]);
-    const signals: Array<{ pid: number; signal: NodeJS.Signals }> = [];
-    const deps = createDeps({
-      listChromiumPidsUsingProfile: async () => (alive.has(4242) ? [4242] : []),
-      readSingletonLock: async () => (alive.has(4242) ? { hostname: "mcp-host", pid: 4242 } : undefined),
-      isProcessAlive: (pid) => alive.has(pid),
-      signalProcess(pid, signal) {
-        signals.push({ pid, signal });
-        if (signal === "SIGTERM") alive.delete(pid);
-      }
-    });
-
-    await prepareChromiumProfile("/app/data/chromium-profile", deps);
-
-    expect(signals).toEqual([{ pid: 4242, signal: "SIGTERM" }]);
-    expect(deps.removed).toBe(true);
+    await preparation.release();
+    expect(deps.released).toBe(true);
   });
 
   it("refuses to clear locks while an active Chromium session still owns the profile", async () => {
@@ -78,20 +84,71 @@ describe("chromium profile lock cleanup feature", () => {
     });
 
     await expect(prepareChromiumProfile("/app/data/chromium-profile", deps)).rejects.toThrow(/still in use/i);
-    expect(deps.signals.some((entry) => entry.pid === 9001)).toBe(true);
     expect(deps.removed).toBe(false);
+    expect(deps.released).toBe(true);
   });
 
-  it("does not signal unrelated Chromium processes that use another profile", async () => {
+  it("refuses cleanup when /proc cannot be inspected", async () => {
     const deps = createDeps({
-      listChromiumPidsUsingProfile: async () => [],
-      readSingletonLock: async () => undefined,
-      isProcessAlive: () => false
+      listChromiumPidsUsingProfile: async () => {
+        throw new Error("Unable to inspect /proc for Chromium profile owners (EACCES); refusing profile cleanup");
+      }
     });
 
-    await prepareChromiumProfile("/app/data/chromium-profile", deps);
+    await expect(prepareChromiumProfile("/app/data/chromium-profile", deps)).rejects.toThrow(/inspect \/proc/i);
+    expect(deps.removed).toBe(false);
+    expect(deps.released).toBe(true);
+  });
 
-    expect(deps.signals).toEqual([]);
+  it("refuses to continue when a Chromium appears between idle checks and lock removal", async () => {
+    let listCalls = 0;
+    const deps = createDeps({
+      listChromiumPidsUsingProfile: async () => {
+        listCalls += 1;
+        // Two idle asserts see an empty profile; the post-removal check sees a new owner.
+        if (listCalls <= 2) return [];
+        return [5555];
+      }
+    });
+
+    await expect(prepareChromiumProfile("/app/data/chromium-profile", deps)).rejects.toThrow(/became in use/i);
     expect(deps.removed).toBe(true);
+    expect(listCalls).toBe(3);
+    expect(deps.released).toBe(true);
+  });
+
+  it("serializes two concurrent profile preparations with an interprocess lock", async () => {
+    const events: string[] = [];
+    let listCalls = 0;
+    const deps = createDeps({
+      listChromiumPidsUsingProfile: async () => {
+        listCalls += 1;
+        return [];
+      },
+      removeSingletonFiles: async () => {
+        events.push("clear-start");
+        await new Promise<void>((resolve) => setTimeout(resolve, 30));
+        events.push("clear-end");
+      }
+    });
+
+    const first = prepareChromiumProfile("/app/data/chromium-profile", deps).then(async (preparation) => {
+      events.push("first-ready");
+      await new Promise<void>((resolve) => setTimeout(resolve, 40));
+      await preparation.release();
+      events.push("first-released");
+    });
+    const second = prepareChromiumProfile("/app/data/chromium-profile", deps).then(async (preparation) => {
+      events.push("second-ready");
+      await preparation.release();
+      events.push("second-released");
+    });
+
+    await Promise.all([first, second]);
+
+    expect(events.indexOf("first-ready")).toBeLessThan(events.indexOf("second-ready"));
+    expect(events.indexOf("clear-end")).toBeLessThan(events.indexOf("second-ready"));
+    expect(events.indexOf("first-released")).toBeLessThan(events.indexOf("second-ready"));
+    expect(listCalls).toBeGreaterThanOrEqual(4);
   });
 });

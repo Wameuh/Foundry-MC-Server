@@ -130,10 +130,10 @@ Plutonium termine encore ses tâches asynchrones du hook `ready`.
 Après une expiration de session, un redémarrage de Foundry ou une déconnexion
 du pont, le navigateur est fermé puis relancé avec un délai fixe configurable.
 Le profil Chromium persiste dans `FOUNDRY_HEADLESS_PROFILE_PATH`. Avant chaque
-lancement, le serveur repère uniquement les processus Chromium qui utilisent ce
-profil (`--user-data-dir`), leur envoie un signal ciblé s'ils sont encore
-présents, attend leur sortie, puis retire les fichiers singleton restants. Aucun
-`pkill chromium` large n'est utilisé. Le serveur sait aussi se réauthentifier
+lancement, le serveur prend un verrou interprocessus sur le profil, vérifie
+qu'aucun Chromium n'utilise déjà ce `--user-data-dir` (sans tuer de processus),
+puis retire uniquement les fichiers singleton clairement périmés. Si `/proc`
+est illisible, le nettoyage est refusé. Le serveur sait aussi se réauthentifier
 lorsque le cookie n'est plus valide.
 
 Les identifiants, le secret du pont et le contenu des fiches ne sont jamais

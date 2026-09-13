@@ -40,8 +40,8 @@ function noopProfileLock(): ChromiumProfileLockDeps {
     readSingletonLock: async () => undefined,
     listChromiumPidsUsingProfile: async () => [],
     isProcessAlive: () => false,
-    signalProcess() {},
     removeSingletonFiles: async () => undefined,
+    acquireInterprocessLock: async () => async () => undefined,
     hostname: () => "test-host",
     now: () => Date.now(),
     sleep: async () => undefined
@@ -304,6 +304,21 @@ describe("automated Foundry authentication feature", () => {
     expect(vi.mocked(chromium.launchPersistentContext).mock.calls[0]?.[1]?.args).toEqual(["--disable-dev-shm-usage"]);
     expect(vi.mocked(chromium.launchPersistentContext).mock.calls[1]?.[1]?.args).toContain("--no-sandbox");
     await browser.close();
+  });
+
+  it("does not treat a generic browser-closed crash as a sandbox failure in auto mode", async () => {
+    vi.mocked(chromium.launchPersistentContext).mockRejectedValueOnce(
+      new Error("browserType.launchPersistentContext: Target page, context or browser has been closed")
+    );
+
+    const browser = new PlaywrightFoundryBrowser(
+      { ...config, chromiumNoSandbox: "auto" },
+      { profileLock: noopProfileLock(), launchPersistentContext: chromium.launchPersistentContext }
+    );
+
+    await expect(browser.openGame()).rejects.toThrow(/Target page, context or browser has been closed/);
+    expect(chromium.launchPersistentContext).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(chromium.launchPersistentContext).mock.calls[0]?.[1]?.args).toEqual(["--disable-dev-shm-usage"]);
   });
 
   it("runs profile lock preparation before launching Chromium", async () => {

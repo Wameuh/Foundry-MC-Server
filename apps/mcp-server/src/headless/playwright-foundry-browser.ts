@@ -40,9 +40,15 @@ export class PlaywrightFoundryBrowser implements FoundryBrowserSession {
 
   async openGame(): Promise<"game" | "join"> {
     await mkdir(this.config.profilePath, { recursive: true });
-    await prepareChromiumProfile(this.config.profilePath, this.profileLock);
-    this.context = await this.launchWithSandboxPolicy();
-    this.page = this.context.pages()[0] ?? await this.context.newPage();
+    const preparation = await prepareChromiumProfile(this.config.profilePath, this.profileLock);
+    try {
+      this.context = await this.launchWithSandboxPolicy();
+    } finally {
+      await preparation.release();
+    }
+    const context = this.context;
+    if (!context) throw new Error("Chromium launch did not produce a browser context");
+    this.page = context.pages()[0] ?? await context.newPage();
     await this.page.goto(route(this.config.foundryUrl, "game"), { waitUntil: "domcontentloaded" });
     return new URL(this.page.url()).pathname.endsWith("/join") ? "join" : "game";
   }
@@ -169,9 +175,12 @@ function launchOptions(config: HeadlessBrowserConfig, args: string[]) {
   };
 }
 
-function isSandboxLaunchFailure(error: unknown): boolean {
+export function isSandboxLaunchFailure(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /no usable sandbox|target page, context or browser has been closed|--no-sandbox/i.test(message);
+  // Only Chromium sandbox diagnostics — never generic launch crashes (OOM, profile, etc.).
+  return /no usable sandbox|zygote_host_impl_linux.*sandbox|please install the chromium-sandbox|try using --no-sandbox/i.test(
+    message
+  );
 }
 
 async function waitForVisible(locator: Locator, timeout: number, element: string, page: Page): Promise<void> {
