@@ -15,7 +15,17 @@ n’appelle pas les migrations internes `flagMigrations`.
 
 Les réglages d’item sont écrits au schéma de flags v5 (`isEnabled`,
 `isCustomized`, `menu`, `primary.video`, …), aligné sur le menu item A-A actuel.
+Pour le `meleeSwitch`, les défauts suivent A-A (`detect: "automatic"`,
+`returning: false`, `switchType: "on"`).
 
+Versions certifiées : `7.0.0` et `7.0.17`. Toute autre version est refusée
+(`compatible: false`, écritures désactivées).
+
+## Mode `flags` avancé
+
+Quand `flags` est fourni à `autoanimations_set_item_animation`, l’objet remplace
+`flags.autoanimations` tel quel. Les champs frères `menu` / `isEnabled` ne sont
+pas réinjectés. Seul `version` est complété s’il est absent.
 ## Outils MCP
 
 | Outil | Effet |

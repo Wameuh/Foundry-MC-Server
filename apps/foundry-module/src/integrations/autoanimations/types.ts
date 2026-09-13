@@ -36,6 +36,6 @@ export type AutomatedAnimationsApi = {
 };
 
 export type SequencerDatabaseApi = {
-  getPathsUnder?: (path: string, softFail?: boolean) => string[] | undefined;
+  getPathsUnder: (path: string, softFail?: boolean) => string[] | undefined;
   getEntry?: (path: string, options?: { softFail?: boolean }) => unknown;
 };

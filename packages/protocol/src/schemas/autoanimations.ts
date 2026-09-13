@@ -63,7 +63,11 @@ export const AutoAnimationsSetItemInputSchema = z
     primary: AutoAnimationsVideoSchema.optional(),
     /** When true, merge onto existing A-A flags when the menu matches. */
     merge: z.boolean().default(true),
-    /** Advanced escape hatch: replace the full flags.autoanimations object. */
+    /**
+     * Advanced escape hatch: replace the full `flags.autoanimations` object as-is.
+     * Unlike the primary-video path, this mode does not rewrite menu/isEnabled/
+     * isCustomized/label from the sibling fields; only `version` is filled when missing.
+     */
     flags: SafeJsonObjectSchema.optional()
   })
   .strict()

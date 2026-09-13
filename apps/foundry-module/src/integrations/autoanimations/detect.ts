@@ -1,4 +1,4 @@
-import type { AutomatedAnimationsApi } from "./types";
+import type { AutomatedAnimationsApi, SequencerDatabaseApi } from "./types";
 
 export const AUTOANIMATIONS_MODULE_ID = "autoanimations";
 export const AUTOANIMATIONS_FLAG_VERSION = 5;
@@ -31,11 +31,10 @@ export function isAutomatedAnimationsApi(value: unknown): value is AutomatedAnim
   );
 }
 
-export function getSequencerDatabase() {
+export function getSequencerDatabase(): SequencerDatabaseApi | undefined {
   const sequencer = (globalThis as { Sequencer?: { Database?: unknown } }).Sequencer;
   if (!sequencer?.Database || typeof sequencer.Database !== "object") return undefined;
-  return sequencer.Database as {
-    getPathsUnder?: (path: string, softFail?: boolean) => string[] | undefined;
-    getEntry?: (path: string, options?: { softFail?: boolean }) => unknown;
-  };
+  const database = sequencer.Database as SequencerDatabaseApi;
+  if (typeof database.getPathsUnder !== "function") return undefined;
+  return database;
 }

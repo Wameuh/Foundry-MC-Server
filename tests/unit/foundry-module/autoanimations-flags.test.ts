@@ -59,4 +59,26 @@ describe("Automated Animations flag builder", () => {
     expect((merged.primary as { video: { color: string } }).video.color).toBe("purple");
     expect(merged.id).toBe(existing.id);
   });
+
+  it("uses A-A meleeSwitch detect=automatic (not auto)", () => {
+    const flags = buildItemAnimationFlags({
+      label: "Longsword",
+      menu: "melee",
+      isEnabled: true,
+      merge: false,
+      primary: {
+        menuType: "weapon",
+        animation: "sword",
+        variant: "01",
+        color: "white"
+      }
+    });
+
+    expect(
+      (flags.meleeSwitch as { options: { detect: string; returning: boolean } }).options
+    ).toMatchObject({
+      detect: "automatic",
+      returning: false
+    });
+  });
 });

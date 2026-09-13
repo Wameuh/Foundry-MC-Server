@@ -19,7 +19,7 @@
     ],
     "recommends": [
       { "id": "plutonium", "type": "module", "compatibility": { "minimum": "2.15.8", "verified": "2.18.3.v14" } },
-      { "id": "autoanimations", "type": "module", "compatibility": { "minimum": "7.0.0", "verified": "7.0.0" } }
+      { "id": "autoanimations", "type": "module", "compatibility": { "minimum": "7.0.0", "verified": "7.0.17" } }
     ]
   }
 }

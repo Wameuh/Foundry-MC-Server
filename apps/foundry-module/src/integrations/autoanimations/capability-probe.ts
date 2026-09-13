@@ -1,3 +1,4 @@
+import { getAutoAnimationsCompatibility } from "./compatibility";
 import {
   AUTOANIMATIONS_MENUS,
   getAutoAnimationsModule,
@@ -23,6 +24,8 @@ export function getAutoAnimationsCapabilities(): AutoAnimationsCapabilities {
 
 export function refreshAutoAnimationsCapabilities(): AutoAnimationsCapabilities {
   const module = getAutoAnimationsModule();
+  const compatibility = getAutoAnimationsCompatibility();
+
   if (!module) {
     capabilities = {
       active: false,
@@ -32,7 +35,7 @@ export function refreshAutoAnimationsCapabilities(): AutoAnimationsCapabilities 
       autorecRead: false,
       catalogSearch: false,
       menus: [],
-      reason: "Automated Animations is not installed.",
+      reason: compatibility.reason ?? "Automated Animations is not installed.",
     };
     return getAutoAnimationsCapabilities();
   }
@@ -47,7 +50,22 @@ export function refreshAutoAnimationsCapabilities(): AutoAnimationsCapabilities 
       autorecRead: false,
       catalogSearch: false,
       menus: [],
-      reason: "Automated Animations is inactive.",
+      reason: compatibility.reason ?? "Automated Animations is inactive.",
+    };
+    return getAutoAnimationsCapabilities();
+  }
+
+  if (!compatibility.compatible) {
+    capabilities = {
+      active: true,
+      ...(module.version ? { version: module.version } : {}),
+      compatible: false,
+      itemRead: false,
+      itemWrite: false,
+      autorecRead: false,
+      catalogSearch: false,
+      menus: [],
+      ...(compatibility.reason ? { reason: compatibility.reason } : {}),
     };
     return getAutoAnimationsCapabilities();
   }
@@ -69,7 +87,7 @@ export function refreshAutoAnimationsCapabilities(): AutoAnimationsCapabilities 
     return getAutoAnimationsCapabilities();
   }
 
-  const catalogSearch = Boolean(getSequencerDatabase()?.getPathsUnder);
+  const catalogSearch = typeof getSequencerDatabase()?.getPathsUnder === "function";
   capabilities = {
     active: true,
     ...(module.version ? { version: module.version } : {}),

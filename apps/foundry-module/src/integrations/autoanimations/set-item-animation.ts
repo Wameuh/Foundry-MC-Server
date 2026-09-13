@@ -31,22 +31,30 @@ export async function setItemAnimation(payload: unknown, operationId: string) {
 
   let flags: Record<string, unknown>;
   if (input.flags) {
+    // Advanced replace mode: the provided object becomes flags.autoanimations as-is.
+    // Callers own menu/isEnabled/isCustomized/label/version; we only fill version when absent.
     assertSafeObject(input.flags, "flags");
-    flags = {
-      ...input.flags,
-      isCustomized: true,
-      isEnabled: input.isEnabled,
-      menu: input.menu,
-      version: typeof input.flags.version === "number" ? input.flags.version : AUTOANIMATIONS_FLAG_VERSION,
-      label: typeof input.flags.label === "string" ? input.flags.label : document.name ?? document.id,
-    };
+    flags = { ...input.flags };
+    if (typeof flags.version !== "number") {
+      flags.version = AUTOANIMATIONS_FLAG_VERSION;
+    }
   } else if (input.primary) {
     const existing = readItemAutoAnimationFlags(document);
     flags = buildItemAnimationFlags({
       label: document.name ?? document.id,
       menu: input.menu as AutoAnimationsMenu,
       isEnabled: input.isEnabled,
-      primary: input.primary as AutoAnimationsVideo,
+      primary: {
+        menuType: input.primary.menuType,
+        animation: input.primary.animation,
+        variant: input.primary.variant,
+        color: input.primary.color,
+        ...(input.primary.dbSection ? { dbSection: input.primary.dbSection } : {}),
+        ...(typeof input.primary.enableCustom === "boolean"
+          ? { enableCustom: input.primary.enableCustom }
+          : {}),
+        ...(input.primary.customPath ? { customPath: input.primary.customPath } : {}),
+      } satisfies AutoAnimationsVideo,
       ...(existing ? { existing } : {}),
       merge: input.merge,
     });

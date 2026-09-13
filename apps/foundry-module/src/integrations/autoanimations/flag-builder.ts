@@ -324,6 +324,8 @@ export function buildItemAnimationFlags(input: {
   };
 
   if (menu === "melee") {
+    // Match A-A default meleeSwitch schema (common/meleeSwitch.js): detect is
+    // "automatic" | "manual", and the boolean is named `returning`.
     base.meleeSwitch = {
       video: {
         dbSection: "range",
@@ -336,9 +338,9 @@ export function buildItemAnimationFlags(input: {
       },
       sound: sound(),
       options: {
-        detect: "auto",
+        detect: "automatic",
         range: 2,
-        isReturning: false,
+        returning: false,
         switchType: "on",
       },
     };
