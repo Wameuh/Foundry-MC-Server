@@ -2,10 +2,10 @@
   "id": "foundry-mcp-bridge",
   "title": "Foundry MCP Bridge",
   "description": "Secure bridge between a remote MCP server and Foundry VTT.",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "url": "https://github.com/Wameuh/Foundry-MC-Server",
   "manifest": "https://raw.githubusercontent.com/Wameuh/Foundry-MC-Server/main/apps/foundry-module/module.json",
-  "download": "https://github.com/Wameuh/Foundry-MC-Server/releases/download/v0.2.4/foundry-mcp-bridge-0.2.4.zip",
+  "download": "https://github.com/Wameuh/Foundry-MC-Server/releases/download/v0.2.5/foundry-mcp-bridge-0.2.5.zip",
   "authors": [{ "name": "Foundry MCP contributors" }],
   "esmodules": ["foundry-mcp.js"],
   "languages": [
@@ -18,7 +18,8 @@
       { "id": "dnd5e", "type": "system", "compatibility": { "minimum": "5.3.0", "verified": "5.3.3" } }
     ],
     "recommends": [
-      { "id": "plutonium", "type": "module", "compatibility": { "minimum": "2.15.8", "verified": "2.18.3.v14" } }
+      { "id": "plutonium", "type": "module", "compatibility": { "minimum": "2.15.8", "verified": "2.18.3.v14" } },
+      { "id": "autoanimations", "type": "module", "compatibility": { "minimum": "7.0.0", "verified": "7.0.22" } }
     ]
   }
 }

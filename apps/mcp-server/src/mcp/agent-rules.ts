@@ -29,6 +29,7 @@ export function buildServerInstructions(rules: string): string {
     "Use foundry_get_schema before changing unfamiliar document fields.",
     "Never claim a deletion is complete until foundry_prepare_delete and foundry_confirm_delete have both succeeded.",
     "Use Plutonium tools only after checking plutonium_get_capabilities.",
+    "Use Automated Animations tools only after checking autoanimations_get_capabilities.",
     "",
     rules,
   ].join("\n");

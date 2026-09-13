@@ -1,5 +1,6 @@
 import { BridgeClient } from "../bridge/bridge-client";
 import { contextTracker } from "../bridge/context-tracker";
+import { refreshAutoAnimationsCapabilities } from "../integrations/autoanimations/capability-probe";
 import { refreshPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
 import { subscribeToBridgeSettings } from "../settings/register-settings";
 import { offerAssistantAccountProvisioning } from "../provisioning/assistant-account";
@@ -19,6 +20,12 @@ export function onReady(): void {
   // Capability discovery can instantiate several Plutonium importers. Keep it
   // off the critical bridge connection path; MCP calls re-probe before use.
   void refreshPlutoniumCapabilities();
+  // Automated Animations publishes window.AutomatedAnimations during aa.initialize.
+  Hooks.once("aa.initialize", () => {
+    refreshAutoAnimationsCapabilities();
+    bridgeClient?.restart();
+  });
+  refreshAutoAnimationsCapabilities();
 
   // Client-scoped settings use their registered onChange callback. This is
   // also triggered by the automated browser when it configures its profile.

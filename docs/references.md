@@ -8,5 +8,6 @@
 - [Plutonium Next](https://github.com/TheGiddyLimit/plutonium-next) et [son manifeste Foundry 14](https://github.com/TheGiddyLimit/plutonium-next/blob/master/module-foundry14.json) : distribution et matrice certifiée.
 - [Manifeste Plutonium Foundry 14 v2.15.8](https://github.com/TheGiddyLimit/plutonium-next/releases/download/v2.15.8/module-foundry14.json) : version historique explicitement supportée et vérifiée dans le bundle distribué.
 - [5etools](https://5e.tools/) : format et catalogue de contenu D&D5e consommés par Plutonium. Le projet utilise les copies locales et le chargeur de Plutonium plutôt que de scraper le site.
+- [Automated Animations](https://github.com/theripper93/autoanimations) et [sa wiki](https://wiki.theripper93.com/free/autoanimations) : flags item, AutorecManager et catalogue Sequencer.
 
-L’API officielle Foundry prévaut sur le wiki communautaire. Toute API Plutonium non documentée doit rester isolée dans l’adaptateur et couverte par un test de contrat.
+L’API officielle Foundry prévaut sur le wiki communautaire. Toute API Plutonium ou Automated Animations non documentée doit rester isolée dans l’adaptateur et couverte par un test de contrat.

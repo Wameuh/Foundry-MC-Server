@@ -21,7 +21,7 @@ Ne jamais ajouter `.env` ou un fichier contenant des identifiants :
 git status --short
 git add -A
 git diff --cached --check
-git commit -m "Release v0.2.4"
+git commit -m "Release v0.2.5"
 git push origin main
 ```
 

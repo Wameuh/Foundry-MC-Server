@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DocumentReferenceSchema, EmptyInputSchema, NonEmptyIdentifierSchema, UuidSchema } from "./common.js";
+import { AutoAnimationsCapabilitiesSchema } from "./autoanimations.js";
 import { PlutoniumCapabilitiesSchema } from "./plutonium.js";
 
 export const FoundryGetStatusInputSchema = EmptyInputSchema;
@@ -55,7 +56,8 @@ export const FoundryStatusSchema = z
       })
       .strict()
       .optional(),
-    plutonium: PlutoniumCapabilitiesSchema.optional()
+    plutonium: PlutoniumCapabilitiesSchema.optional(),
+    autoanimations: AutoAnimationsCapabilitiesSchema.optional()
   })
   .strict();
 export type FoundryStatus = z.infer<typeof FoundryStatusSchema>;

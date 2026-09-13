@@ -15,6 +15,11 @@ import { buildCharacter } from "../dnd5e/actor-builder";
 import { refreshPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
 import { importPlutoniumReference } from "../integrations/plutonium/reference-import";
 import { importPlutoniumEntries } from "../integrations/plutonium/json-import";
+import { refreshAutoAnimationsCapabilities } from "../integrations/autoanimations/capability-probe";
+import { getItemAnimation } from "../integrations/autoanimations/get-item-animation";
+import { setItemAnimation } from "../integrations/autoanimations/set-item-animation";
+import { getAutorecMenus } from "../integrations/autoanimations/get-autorec";
+import { searchAnimationCatalog } from "../integrations/autoanimations/search-catalog";
 import { OperationError } from "../operations/errors";
 
 type Handler = (payload: unknown, operationId: string) => unknown;
@@ -39,6 +44,12 @@ const handlers: Record<string, Handler> = {
   "plutonium.getCapabilities": () => refreshPlutoniumCapabilities(),
   "plutonium.importReference": importPlutoniumReference,
   "plutonium.importEntries": importPlutoniumEntries,
+  // Automated Animations exposes window.AutomatedAnimations after aa.initialize.
+  "autoanimations.getCapabilities": () => refreshAutoAnimationsCapabilities(),
+  "autoanimations.getItemAnimation": (payload) => getItemAnimation(payload),
+  "autoanimations.setItemAnimation": setItemAnimation,
+  "autoanimations.getAutorec": () => getAutorecMenus(),
+  "autoanimations.searchCatalog": (payload) => searchAnimationCatalog(payload),
 };
 
 export async function dispatchRequest(request: BridgeRequest): Promise<BridgeResponse> {

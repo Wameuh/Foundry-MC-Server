@@ -15,7 +15,12 @@ export const BridgeCapability = {
   DND5E_CHARACTER_BUILD: "dnd5e.character.build",
   PLUTONIUM_CAPABILITIES: "plutonium.capabilities",
   PLUTONIUM_REFERENCE_IMPORT: "plutonium.import.reference",
-  PLUTONIUM_JSON_IMPORT: "plutonium.import.json"
+  PLUTONIUM_JSON_IMPORT: "plutonium.import.json",
+  AUTOANIMATIONS_CAPABILITIES: "autoanimations.capabilities",
+  AUTOANIMATIONS_ITEM_READ: "autoanimations.item.read",
+  AUTOANIMATIONS_ITEM_WRITE: "autoanimations.item.write",
+  AUTOANIMATIONS_AUTOREC_READ: "autoanimations.autorec.read",
+  AUTOANIMATIONS_CATALOG_SEARCH: "autoanimations.catalog.search"
 } as const;
 
 export const KnownBridgeCapabilitySchema = z.enum(BridgeCapability);

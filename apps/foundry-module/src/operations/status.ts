@@ -1,3 +1,4 @@
+import { refreshAutoAnimationsCapabilities } from "../integrations/autoanimations/capability-probe";
 import { refreshPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
 
 export async function getStatus() {
@@ -8,5 +9,6 @@ export async function getStatus() {
     system: { id: game.system.id, version: game.system.version },
     user: game.user ? { id: game.user.id, name: game.user.name, isGM: game.user.isGM } : undefined,
     plutonium: await refreshPlutoniumCapabilities(),
+    autoanimations: refreshAutoAnimationsCapabilities(),
   };
 }

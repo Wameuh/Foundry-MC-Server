@@ -18,10 +18,22 @@ export class FakeFoundryDocument {
     this.data = { ...data, _id: id, name };
   }
 
-  toObject() { return { ...this.data, _id: this.id, name: this.name, type: this.documentName, items: this.items.map((item) => item.toObject()) }; }
+  toObject(_source = true) {
+    return {
+      ...structuredClone(this.data),
+      _id: this.id,
+      name: this.name,
+      type: this.documentName,
+      items: this.items.map((item) => item.toObject(_source)),
+    };
+  }
 
-  async update(changes: Record<string, unknown>) {
-    Object.assign(this.data, changes);
+  async update(changes: Record<string, unknown>, options: Record<string, unknown> = {}) {
+    if (options.recursive === true) {
+      deepMerge(this.data, changes);
+    } else {
+      Object.assign(this.data, changes);
+    }
     if (typeof changes.name === "string") this.name = changes.name;
     return this;
   }
@@ -41,6 +53,22 @@ export class FakeFoundryDocument {
   async delete() { this.deleted = true; }
 
   isDeleted() { return this.deleted; }
+}
+
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const current = target[key];
+      const nested =
+        current && typeof current === "object" && !Array.isArray(current)
+          ? (current as Record<string, unknown>)
+          : {};
+      target[key] = nested;
+      deepMerge(nested, value as Record<string, unknown>);
+      continue;
+    }
+    target[key] = value;
+  }
 }
 
 export function installFakeFoundry(documents: FakeFoundryDocument[]) {

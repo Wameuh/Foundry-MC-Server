@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 
+import { registerAutoAnimationsTools } from "./tools/autoanimations.js";
 import { registerCompendiumTools } from "./tools/compendiums.js";
 import { registerContextTools } from "./tools/context.js";
 import { registerDeletionTools } from "./tools/deletion.js";
@@ -18,5 +19,6 @@ export function registerTools(server: McpServer, dependencies: ToolDependencies)
   registerCompendiumTools(server, dependencies);
   registerDnd5eCharacterTool(server, dependencies);
   registerPlutoniumTools(server, dependencies);
+  registerAutoAnimationsTools(server, dependencies);
   registerDeletionTools(server, dependencies);
 }

@@ -2,7 +2,8 @@
 
 Serveur MCP et module pont pour piloter Foundry VTT 14 depuis Codex CLI ou un
 autre client MCP. Le pont s'exécute dans le navigateur d'un GM et utilise les
-API publiques de Foundry, ainsi qu'un adaptateur Plutonium optionnel.
+API publiques de Foundry, ainsi qu'un adaptateur Plutonium optionnel et un
+adaptateur Automated Animations pour lire/écrire les animations d'items.
 
 Les règles de travail apprises au fil des corrections sont maintenues dans
 [`agent_rules.md`](agent_rules.md). Leur contenu complet est transmis à tout
