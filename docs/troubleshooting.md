@@ -2,7 +2,7 @@
 
 **`BRIDGE_UNAVAILABLE`** : ouvrir le monde dans un navigateur et se connecter avec un GM. Vérifier l’URL WSS, le reverse proxy et le secret.
 
-**Plutonium indisponible** : vérifier que le module est actif et que sa version est `2.18.1.v14` ou `2.18.3.v14`. Les outils Foundry restent utilisables sans lui.
+**Plutonium indisponible** : vérifier que le module est actif et que sa version est `2.15.8`, `2.18.1.v14` ou `2.18.3.v14`. Les outils Foundry restent utilisables sans lui.
 
 **`PLUTONIUM_IMPORT_TIMEOUT`** : vérifier la connexion du navigateur GM et
 consulter les notifications Foundry. Les imports de créatures peuvent charger

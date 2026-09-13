@@ -14,6 +14,9 @@ export const MAX_PLUTONIUM_PAYLOAD_BYTES = 2 * 1024 * 1024;
 
 export const SUPPORTED_FOUNDRY_VERSION = "14.367" as const;
 export const SUPPORTED_DND5E_VERSION = "5.3.3" as const;
-export const SUPPORTED_PLUTONIUM_VERSIONS = ["2.18.1.v14", "2.18.3.v14"] as const;
+// Plutonium 2.15.8 is distributed with an un-suffixed version in its Foundry
+// 14 manifest. Keep the exact identifier here; compatibility is deliberately
+// allow-listed rather than inferred from a semver range.
+export const SUPPORTED_PLUTONIUM_VERSIONS = ["2.18.1.v14", "2.18.3.v14", "2.15.8"] as const;
 /** @deprecated Use SUPPORTED_PLUTONIUM_VERSIONS for compatibility checks. */
 export const SUPPORTED_PLUTONIUM_VERSION = SUPPORTED_PLUTONIUM_VERSIONS[0];

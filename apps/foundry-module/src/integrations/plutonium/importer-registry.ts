@@ -39,6 +39,13 @@ const VERSIONED_IMPORTER_MAPPINGS: readonly {
   mappings: Readonly<Record<string, PlutoniumImporterMapping>>;
 }[] = Object.freeze([
   Object.freeze({
+    version: "2.15.8",
+    mappings: Object.freeze({
+      ...DEFAULT_IMPORTER_MAPPINGS,
+      creature: CERTIFIED_CREATURE_MAPPING
+    })
+  }),
+  Object.freeze({
     version: "2.18.1.v14",
     mappings: Object.freeze({
       ...DEFAULT_IMPORTER_MAPPINGS,

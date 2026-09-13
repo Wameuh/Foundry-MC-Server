@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { refreshPlutoniumCapabilities } from '../../apps/foundry-module/src/integrations/plutonium/capability-probe.js';
 import { isPlutoniumApi } from '../../apps/foundry-module/src/integrations/plutonium/detect.js';
 import { importPlutoniumReference } from '../../apps/foundry-module/src/integrations/plutonium/reference-import.js';
+import { importPlutoniumEntries } from '../../apps/foundry-module/src/integrations/plutonium/json-import.js';
 import { normalizePlutoniumResult } from '../../apps/foundry-module/src/integrations/plutonium/normalize-result.js';
 import { createFakePlutonium } from '../helpers/fake-plutonium.js';
 
@@ -17,6 +18,23 @@ describe('Plutonium import integration contract', () => {
     expect(isPlutoniumApi(fake.api)).toBe(true);
     const importer = await fake.api.importer.pGetImporter({ prop: 'spell' });
     await importer?.pImportEntry({ name: 'Fireball', source: 'PHB', __prop: 'spell' }, {});
+    expect(fake.imported).toHaveLength(1);
+  });
+
+  it('imports a canonical 5etools entry with Plutonium 2.15.8', async () => {
+    const fake = createFakePlutonium();
+    Object.assign(fake.api, { config: { getValue: () => true } });
+    (globalThis as Record<string, unknown>).game = {
+      user: { isGM: true },
+      modules: new Map([['plutonium', { active: true, version: '2.15.8', api: fake.api }]]),
+    };
+
+    const receipt = await importPlutoniumEntries({
+      entries: [{ prop: 'spell', data: { name: 'Fireball', source: 'PHB', __prop: 'spell' } }],
+      destination: { type: 'world' },
+    }, 'operation-2-15-8');
+
+    expect(receipt).toMatchObject({ provider: 'plutonium', status: 'completed', providerVersion: '2.15.8' });
     expect(fake.imported).toHaveLength(1);
   });
 

@@ -21,7 +21,7 @@ describe("Plutonium compatibility feature", () => {
     delete (globalThis as Record<string, unknown>).game;
   });
 
-  it.each(["2.18.1.v14", "2.18.3.v14"])("accepts tested version %s", async (version) => {
+  it.each(["2.15.8", "2.18.1.v14", "2.18.3.v14"])("accepts tested version %s", async (version) => {
     installPlutonium(version);
 
     expect(getPlutoniumCompatibility()).toMatchObject({ compatible: true, version });

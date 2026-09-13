@@ -220,5 +220,5 @@ unzip "artifacts/foundry-mcp-bridge-${MODULE_VERSION}.zip" \
 
 Redémarrer Foundry, puis activer le module dans le monde.
 
-Plutonium reste facultatif. La matrice certifiée est Foundry `14.367`, D&D5e
-`5.3.3` et Plutonium `2.18.1.v14` ou `2.18.3.v14`.
+Plutonium reste facultatif. Les versions prises en charge sont Foundry
+`14.367`, D&D5e `5.3.3` et Plutonium `2.15.8`, `2.18.1.v14` ou `2.18.3.v14`.

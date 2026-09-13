@@ -11,8 +11,10 @@ déprécié, le backend interne ou les fenêtres interactives. Les entrées JSON
 sont validées et limitées à 20 entrées/2 MiB.
 
 Les versions certifiées sont `2.18.1.v14` et `2.18.3.v14`, avec Foundry
-`14.367` et D&D5e `5.3.3`. Toute autre version désactive Plutonium tout en
-laissant les outils Foundry natifs disponibles.
+`14.367` et D&D5e `5.3.3`. `2.15.8` est également supportée : son manifeste
+Foundry 14 et sa surface API publique ont été vérifiés, mais un test live avec
+cette version reste recommandé. Toute autre version désactive Plutonium tout
+en laissant les outils Foundry natifs disponibles.
 
 Plutonium publie son API à la fin de sa propre initialisation asynchrone. Le
 pont accepte donc de démarrer sans cette API, puis la détecte à nouveau lors
