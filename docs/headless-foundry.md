@@ -56,6 +56,9 @@ Construire et démarrer :
 
 ```sh
 mkdir -p data
+# Le conteneur tourne en user `node` (uid 1000). Si un ancien lancement root/sudo
+# a créé des fichiers dans data/, corriger les permissions avant de démarrer :
+#   sudo chown -R 1000:1000 data
 docker compose -f deploy/compose.example.yaml up -d --build
 docker compose -f deploy/compose.example.yaml logs -f foundry-mcp
 ```
@@ -129,12 +132,15 @@ Plutonium termine encore ses tâches asynchrones du hook `ready`.
 
 Après une expiration de session, un redémarrage de Foundry ou une déconnexion
 du pont, le navigateur est fermé puis relancé avec un délai fixe configurable.
-Le profil Chromium persiste dans `FOUNDRY_HEADLESS_PROFILE_PATH`. Avant chaque
+Le profil Chromium persiste dans `FOUNDRY_HEADLESS_PROFILE_PATH`. Ce répertoire
+est **strictement réservé** au serveur MCP headless : ne pas y pointer un
+Chromium personnel, un second serveur MCP, ni un autre outil. Avant chaque
 lancement, le serveur prend un verrou interprocessus sur le profil, vérifie
 qu'aucun Chromium n'utilise déjà ce `--user-data-dir` (sans tuer de processus),
-puis retire uniquement les fichiers singleton clairement périmés. Si `/proc`
-est illisible, le nettoyage est refusé. Le serveur sait aussi se réauthentifier
-lorsque le cookie n'est plus valide.
+puis retire uniquement les fichiers singleton clairement périmés. Si `/proc` ou
+un `/proc/<pid>/cmdline` est illisible (hors PID disparu), le nettoyage est
+refusé. Le serveur sait aussi se réauthentifier lorsque le cookie n'est plus
+valide.
 
 Les identifiants, le secret du pont et le contenu des fiches ne sont jamais
 écrits dans les journaux.

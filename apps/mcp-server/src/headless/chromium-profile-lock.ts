@@ -218,10 +218,22 @@ async function readProcCmdline(pid: number): Promise<string[] | undefined> {
     const raw = await readFile(`/proc/${pid}/cmdline`);
     if (raw.length === 0) return undefined;
     return raw.toString("utf8").split("\0").filter(Boolean);
-  } catch {
-    // PID directories can vanish between readdir and read; that is not an inspection failure.
-    return undefined;
+  } catch (error) {
+    // Only a vanished PID between readdir and read is ignorable. Permission
+    // errors must fail closed so an active Chromium cannot become invisible.
+    if (isTransientProcGoneError(error)) return undefined;
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Unable to read /proc/${pid}/cmdline (${detail}); refusing profile cleanup`);
   }
+}
+
+/** ENOENT/ESRCH: PID disappeared mid-scan. EACCES/EPERM and other errors are fatal. */
+export function isTransientProcGoneError(error: unknown): boolean {
+  return isNodeErrno(error, "ENOENT") || isNodeErrno(error, "ESRCH");
+}
+
+function isNodeErrno(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
 function isChromiumCommand(cmdline: string[]): boolean {

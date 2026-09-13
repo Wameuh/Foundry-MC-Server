@@ -21,4 +21,5 @@ cela retire une frontière de sécurité du processus navigateur. En mode `auto`
 le repli sans sandbox n'est déclenché que par un diagnostic Chromium explicite
 sur le sandbox, jamais par un crash générique. Le nettoyage du profil n'envoie
 aucun signal aux navigateurs : il refuse d'agir si le profil est encore utilisé
-ou si l'inspection des processus échoue.
+ou si l'inspection des processus échoue. `FOUNDRY_HEADLESS_PROFILE_PATH` doit
+rester un répertoire dédié exclusivement à cette instance du serveur MCP.

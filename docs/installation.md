@@ -105,6 +105,8 @@ Construire et démarrer le service :
 
 ```sh
 mkdir -p data
+# Si data/ a déjà été créé par root/sudo, corriger avant le démarrage :
+#   sudo chown -R 1000:1000 data
 docker compose -f deploy/compose.example.yaml up -d --build
 docker compose -f deploy/compose.example.yaml ps
 curl --fail http://127.0.0.1:3210/health

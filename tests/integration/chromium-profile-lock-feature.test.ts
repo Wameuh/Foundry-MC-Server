@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isTransientProcGoneError,
   prepareChromiumProfile,
   type ChromiumProfileLockDeps
 } from "../../apps/mcp-server/src/headless/chromium-profile-lock.js";
@@ -96,6 +97,25 @@ describe("chromium profile lock cleanup feature", () => {
     });
 
     await expect(prepareChromiumProfile("/app/data/chromium-profile", deps)).rejects.toThrow(/inspect \/proc/i);
+    expect(deps.removed).toBe(false);
+    expect(deps.released).toBe(true);
+  });
+
+  it("treats only ENOENT/ESRCH as a vanished /proc pid and fails closed on EACCES/EPERM", () => {
+    expect(isTransientProcGoneError(Object.assign(new Error("gone"), { code: "ENOENT" }))).toBe(true);
+    expect(isTransientProcGoneError(Object.assign(new Error("gone"), { code: "ESRCH" }))).toBe(true);
+    expect(isTransientProcGoneError(Object.assign(new Error("denied"), { code: "EACCES" }))).toBe(false);
+    expect(isTransientProcGoneError(Object.assign(new Error("denied"), { code: "EPERM" }))).toBe(false);
+  });
+
+  it("refuses cleanup when an individual /proc cmdline read is denied", async () => {
+    const deps = createDeps({
+      listChromiumPidsUsingProfile: async () => {
+        throw new Error("Unable to read /proc/4242/cmdline (EACCES: permission denied); refusing profile cleanup");
+      }
+    });
+
+    await expect(prepareChromiumProfile("/app/data/chromium-profile", deps)).rejects.toThrow(/cmdline/i);
     expect(deps.removed).toBe(false);
     expect(deps.released).toBe(true);
   });

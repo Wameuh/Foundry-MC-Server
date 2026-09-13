@@ -41,3 +41,8 @@ sous AppArmor/conteneur. Hors Docker, laisser `false` pour conserver le sandbox.
 **`TARGET_WORLD_ID` incorrect** : l'identifiant doit correspondre à
 `game.world.id` (souvent visible via `/api/status`, champ `world`), pas au titre
 affiché du monde.
+
+**Permissions sur `data/` après un lancement root/sudo** : le Compose monte
+`./data` et le processus tourne en uid `1000` (`node`). Si le répertoire a été
+créé ou modifié en root, Chromium ou le verrou de profil peut échouer. Corriger
+avec `sudo chown -R 1000:1000 data` puis relancer le conteneur.
