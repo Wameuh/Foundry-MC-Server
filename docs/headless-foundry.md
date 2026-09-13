@@ -56,6 +56,9 @@ Construire et démarrer :
 
 ```sh
 mkdir -p data
+# Le conteneur tourne en user `node` (uid 1000). Si un ancien lancement root/sudo
+# a créé des fichiers dans data/, corriger les permissions avant de démarrer :
+#   sudo chown -R 1000:1000 data
 docker compose -f deploy/compose.example.yaml up -d --build
 docker compose -f deploy/compose.example.yaml logs -f foundry-mcp
 ```
@@ -93,9 +96,17 @@ FOUNDRY_HEADLESS_ACCESS_KEY=une-cle-foundry-forte
 FOUNDRY_HEADLESS_BRIDGE_URL=ws://127.0.0.1:3210/foundry-mcp/bridge
 FOUNDRY_HEADLESS_CHROMIUM_PATH=/usr/bin/chromium
 FOUNDRY_HEADLESS_PROFILE_PATH=./data/chromium-profile
+FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX=false
 FOUNDRY_HEADLESS_READY_TIMEOUT_MS=300000
 FOUNDRY_HEADLESS_BRIDGE_GRACE_MS=180000
 ```
+
+`FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX` laisse le sandbox Chromium actif par
+défaut (`false`). Passer à `true` désactive cette frontière de sécurité et n'est
+justifié que lorsque l'environnement (souvent Docker/AppArmor) empêche le
+sandbox de démarrer. La valeur `auto` tente d'abord le lancement sandboxed, puis
+retente une seule fois avec `--no-sandbox` en cas d'échec lié au sandbox. Le
+Compose d'exemple force `true` dans le conteneur.
 
 Démarrer ensuite le serveur :
 
@@ -121,8 +132,15 @@ Plutonium termine encore ses tâches asynchrones du hook `ready`.
 
 Après une expiration de session, un redémarrage de Foundry ou une déconnexion
 du pont, le navigateur est fermé puis relancé avec un délai fixe configurable.
-Le profil Chromium persiste dans `FOUNDRY_HEADLESS_PROFILE_PATH`, mais le serveur
-sait se réauthentifier lorsque le cookie n'est plus valide.
+Le profil Chromium persiste dans `FOUNDRY_HEADLESS_PROFILE_PATH`. Ce répertoire
+est **strictement réservé** au serveur MCP headless : ne pas y pointer un
+Chromium personnel, un second serveur MCP, ni un autre outil. Avant chaque
+lancement, le serveur prend un verrou interprocessus sur le profil, vérifie
+qu'aucun Chromium n'utilise déjà ce `--user-data-dir` (sans tuer de processus),
+puis retire uniquement les fichiers singleton clairement périmés. Si `/proc` ou
+un `/proc/<pid>/cmdline` est illisible (hors PID disparu), le nettoyage est
+refusé. Le serveur sait aussi se réauthentifier lorsque le cookie n'est plus
+valide.
 
 Les identifiants, le secret du pont et le contenu des fiches ne sont jamais
 écrits dans les journaux.
