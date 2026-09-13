@@ -2,7 +2,7 @@ import {
   AUTOANIMATIONS_FLAG_VERSION,
   AUTOANIMATIONS_MODULE_ID,
 } from "./detect";
-import type { AutoAnimationsMenu, AutoAnimationsVideo } from "./types";
+import type { AutoAnimationsSimplifiedMenu, AutoAnimationsVideo } from "./types";
 
 type SoundData = {
   enable: boolean;
@@ -128,7 +128,7 @@ function macro() {
   return { enable: false, name: undefined, args: undefined, playWhen: undefined };
 }
 
-function primaryOptions(menu: AutoAnimationsMenu): Record<string, unknown> {
+function primaryOptions(menu: AutoAnimationsSimplifiedMenu): Record<string, unknown> {
   switch (menu) {
     case "melee":
       return {
@@ -215,8 +215,6 @@ function primaryOptions(menu: AutoAnimationsMenu): Record<string, unknown> {
         zIndex: 1,
       };
     case "ontoken":
-    case "preset":
-    default:
       return {
         addTokenWidth: false,
         anchor: "0.5",
@@ -245,7 +243,7 @@ function primaryOptions(menu: AutoAnimationsMenu): Record<string, unknown> {
   }
 }
 
-function dbSectionFor(menu: AutoAnimationsMenu, override?: string): string {
+function dbSectionFor(menu: AutoAnimationsSimplifiedMenu, override?: string): string {
   if (override) return override;
   switch (menu) {
     case "melee":
@@ -265,7 +263,7 @@ function randomId(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 }
 
-function toVideo(menu: AutoAnimationsMenu, video: AutoAnimationsVideo): Record<string, unknown> {
+function toVideo(menu: AutoAnimationsSimplifiedMenu, video: AutoAnimationsVideo): Record<string, unknown> {
   const customPath = video.customPath?.trim() ?? "";
   return {
     dbSection: dbSectionFor(menu, video.dbSection),
@@ -280,7 +278,7 @@ function toVideo(menu: AutoAnimationsMenu, video: AutoAnimationsVideo): Record<s
 
 export function buildItemAnimationFlags(input: {
   label: string;
-  menu: AutoAnimationsMenu;
+  menu: AutoAnimationsSimplifiedMenu;
   isEnabled: boolean;
   primary: AutoAnimationsVideo;
   existing?: Record<string, unknown>;
@@ -288,7 +286,7 @@ export function buildItemAnimationFlags(input: {
 }): Record<string, unknown> {
   const { menu, primary, isEnabled, label, merge, existing } = input;
   if (merge && existing && existing.menu === menu && existing.isCustomized === true) {
-    const next = structuredClone(existing) as Record<string, unknown>;
+    const next = structuredClone(existing);
     const currentPrimary =
       next.primary && typeof next.primary === "object"
         ? (structuredClone(next.primary) as Record<string, unknown>)

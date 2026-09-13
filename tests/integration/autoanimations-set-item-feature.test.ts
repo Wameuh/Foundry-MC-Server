@@ -108,6 +108,22 @@ describe("Automated Animations set-item-animation feature", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("accepts certified Automated Animations 7.0.22", () => {
+    const fake = createFakeAutomatedAnimations();
+    (globalThis as Record<string, unknown>).game = {
+      user: { isGM: true },
+      modules: new Map([["autoanimations", { active: true, version: "7.0.22" }]]),
+    };
+    (globalThis as Record<string, unknown>).AutomatedAnimations = fake.api;
+
+    expect(refreshAutoAnimationsCapabilities()).toMatchObject({
+      active: true,
+      compatible: true,
+      itemWrite: true,
+      version: "7.0.22",
+    });
+  });
+
   it("disables writes for an uncertified Automated Animations version", () => {
     const fake = createFakeAutomatedAnimations();
     (globalThis as Record<string, unknown>).game = {
@@ -178,8 +194,6 @@ describe("Automated Animations set-item-animation feature", () => {
     await setItemAnimation(
       {
         uuid: item.uuid,
-        menu: "ontoken",
-        isEnabled: false,
         flags: {
           menu: "aura",
           isEnabled: true,

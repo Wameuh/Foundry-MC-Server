@@ -2,13 +2,13 @@ import type { AutomatedAnimationsApi, SequencerDatabaseApi } from "./types";
 
 export const AUTOANIMATIONS_MODULE_ID = "autoanimations";
 export const AUTOANIMATIONS_FLAG_VERSION = 5;
+/** Menus supported by the simplified primary-video write path (excludes preset). */
 export const AUTOANIMATIONS_MENUS = [
   "melee",
   "range",
   "ontoken",
   "templatefx",
   "aura",
-  "preset",
 ] as const;
 
 export function getAutoAnimationsModule() {

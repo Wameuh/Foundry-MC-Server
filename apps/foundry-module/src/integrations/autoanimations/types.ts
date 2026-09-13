@@ -1,10 +1,11 @@
-export type AutoAnimationsMenu =
+export type AutoAnimationsSimplifiedMenu =
   | "melee"
   | "range"
   | "ontoken"
   | "templatefx"
-  | "aura"
-  | "preset";
+  | "aura";
+
+export type AutoAnimationsMenu = AutoAnimationsSimplifiedMenu | "preset";
 
 export type AutoAnimationsCapabilities = {
   active: boolean;
@@ -14,7 +15,7 @@ export type AutoAnimationsCapabilities = {
   itemWrite: boolean;
   autorecRead: boolean;
   catalogSearch: boolean;
-  menus: AutoAnimationsMenu[];
+  menus: AutoAnimationsSimplifiedMenu[];
   reason?: string;
 };
 

@@ -1,4 +1,4 @@
-export const APPLICATION_VERSION = "0.2.4" as const;
+export const APPLICATION_VERSION = "0.2.5" as const;
 export const PROTOCOL_VERSION = "1.0.0" as const;
 export const DEFAULT_OPERATION_TIMEOUT_MS = 30_000;
 export const PLUTONIUM_OPERATION_TIMEOUT_MS = 120_000;
@@ -23,5 +23,11 @@ export const SUPPORTED_PLUTONIUM_VERSION = SUPPORTED_PLUTONIUM_VERSIONS[0];
 
 // Automated Animations versions certified against the public
 // window.AutomatedAnimations + flags.autoanimations v5 contract.
-export const SUPPORTED_AUTOANIMATIONS_VERSIONS = ["7.0.0", "7.0.17"] as const;
+export const SUPPORTED_AUTOANIMATIONS_VERSIONS = [
+  "7.0.0",
+  "7.0.17",
+  "7.0.22",
+  "7.0.23",
+  "7.0.24"
+] as const;
 export const SUPPORTED_AUTOANIMATIONS_VERSION = SUPPORTED_AUTOANIMATIONS_VERSIONS[0];

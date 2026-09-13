@@ -1,8 +1,4 @@
-import {
-  AutoAnimationsSetItemInputSchema,
-  type AutoAnimationsMenu,
-  type AutoAnimationsVideo,
-} from "@foundry-mcp/protocol";
+import { AutoAnimationsSetItemInputSchema, type AutoAnimationsVideo } from "@foundry-mcp/protocol";
 import { emptyReceipt, toDocumentReference } from "../../operations/document-reference";
 import { OperationError, requireGm } from "../../operations/errors";
 import { assertSafeObject } from "../../operations/safe-data";
@@ -30,19 +26,19 @@ export async function setItemAnimation(payload: unknown, operationId: string) {
   }
 
   let flags: Record<string, unknown>;
-  if (input.flags) {
+  if ("flags" in input) {
     // Advanced replace mode: the provided object becomes flags.autoanimations as-is.
-    // Callers own menu/isEnabled/isCustomized/label/version; we only fill version when absent.
+    // Required for preset menus (presetType + data). Only fill version when absent.
     assertSafeObject(input.flags, "flags");
     flags = { ...input.flags };
     if (typeof flags.version !== "number") {
       flags.version = AUTOANIMATIONS_FLAG_VERSION;
     }
-  } else if (input.primary) {
+  } else {
     const existing = readItemAutoAnimationFlags(document);
     flags = buildItemAnimationFlags({
       label: document.name ?? document.id,
-      menu: input.menu as AutoAnimationsMenu,
+      menu: input.menu,
       isEnabled: input.isEnabled,
       primary: {
         menuType: input.primary.menuType,
@@ -58,8 +54,6 @@ export async function setItemAnimation(payload: unknown, operationId: string) {
       ...(existing ? { existing } : {}),
       merge: input.merge,
     });
-  } else {
-    throw new AutoAnimationsError("AUTOANIMATIONS_INVALID_FLAGS", "primary is required unless flags is provided.");
   }
 
   const updated = await document.update(

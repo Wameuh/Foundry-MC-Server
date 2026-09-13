@@ -24,14 +24,17 @@ function findAutorecMatch(itemName: string): Record<string, unknown> | undefined
     }
   }
   const rinsed = rinseName(itemName);
-  const sorted = combined.sort(
-    (a, b) =>
-      String(b.label ?? "").replace(/\s+/g, "").length - String(a.label ?? "").replace(/\s+/g, "").length,
-  );
+  const sorted = combined.sort((a, b) => labelKeyLength(b.label) - labelKeyLength(a.label));
   const exact = sorted.find((entry) => entry.label === itemName);
   if (exact) return summarizeAutorec(exact);
-  const best = sorted.find((entry) => typeof entry.label === "string" && rinsed.includes(rinseName(entry.label)));
+  const best = sorted.find(
+    (entry) => typeof entry.label === "string" && rinsed.includes(rinseName(entry.label)),
+  );
   return best ? summarizeAutorec(best) : undefined;
+}
+
+function labelKeyLength(value: unknown): number {
+  return typeof value === "string" ? value.replace(/\s+/g, "").length : 0;
 }
 
 function summarizeAutorec(entry: Record<string, unknown>): Record<string, unknown> {

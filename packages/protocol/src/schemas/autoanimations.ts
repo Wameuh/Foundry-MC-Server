@@ -5,12 +5,22 @@ import {
   UuidSchema
 } from "./common.js";
 
-export const AutoAnimationsMenuSchema = z.enum([
+/** Menus supported by the simplified primary-video write path. */
+export const AutoAnimationsSimplifiedMenuSchema = z.enum([
   "melee",
   "range",
   "ontoken",
   "templatefx",
-  "aura",
+  "aura"
+]);
+export type AutoAnimationsSimplifiedMenu = z.infer<typeof AutoAnimationsSimplifiedMenuSchema>;
+
+/**
+ * All A-A item menus, including `preset`.
+ * Presets require the advanced `flags` replace mode because they need `presetType` + `data`.
+ */
+export const AutoAnimationsMenuSchema = z.enum([
+  ...AutoAnimationsSimplifiedMenuSchema.options,
   "preset"
 ]);
 export type AutoAnimationsMenu = z.infer<typeof AutoAnimationsMenuSchema>;
@@ -29,7 +39,8 @@ export const AutoAnimationsCapabilitiesSchema = z
     itemWrite: z.boolean(),
     autorecRead: z.boolean(),
     catalogSearch: z.boolean(),
-    menus: z.array(AutoAnimationsMenuSchema),
+    /** Menus writable via the simplified `primary` path (excludes preset). */
+    menus: z.array(AutoAnimationsSimplifiedMenuSchema),
     reason: z.string().max(2048).optional()
   })
   .strict();
@@ -55,31 +66,34 @@ export const AutoAnimationsGetItemInputSchema = z
   .strict();
 export type AutoAnimationsGetItemInput = z.infer<typeof AutoAnimationsGetItemInputSchema>;
 
-export const AutoAnimationsSetItemInputSchema = z
+export const AutoAnimationsSetPrimaryInputSchema = z
   .object({
     uuid: UuidSchema,
-    menu: AutoAnimationsMenuSchema,
+    menu: AutoAnimationsSimplifiedMenuSchema,
     isEnabled: z.boolean().default(true),
-    primary: AutoAnimationsVideoSchema.optional(),
-    /** When true, merge onto existing A-A flags when the menu matches. */
     merge: z.boolean().default(true),
-    /**
-     * Advanced escape hatch: replace the full `flags.autoanimations` object as-is.
-     * Unlike the primary-video path, this mode does not rewrite menu/isEnabled/
-     * isCustomized/label from the sibling fields; only `version` is filled when missing.
-     */
-    flags: SafeJsonObjectSchema.optional()
+    primary: AutoAnimationsVideoSchema
   })
-  .strict()
-  .superRefine((value, context) => {
-    if (!value.flags && !value.primary) {
-      context.addIssue({
-        code: "custom",
-        path: ["primary"],
-        message: "primary is required unless flags is provided"
-      });
-    }
-  });
+  .strict();
+export type AutoAnimationsSetPrimaryInput = z.infer<typeof AutoAnimationsSetPrimaryInputSchema>;
+
+export const AutoAnimationsSetFlagsInputSchema = z
+  .object({
+    uuid: UuidSchema,
+    /**
+     * Full `flags.autoanimations` replacement. Required for `preset` menus
+     * (`presetType` + preset-specific `data`). Sibling primary fields are not accepted.
+     */
+    flags: SafeJsonObjectSchema
+  })
+  .strict();
+export type AutoAnimationsSetFlagsInput = z.infer<typeof AutoAnimationsSetFlagsInputSchema>;
+
+/** Exactly one of primary-video mode or full-flags replace mode. */
+export const AutoAnimationsSetItemInputSchema = z.union([
+  AutoAnimationsSetPrimaryInputSchema,
+  AutoAnimationsSetFlagsInputSchema
+]);
 export type AutoAnimationsSetItemInput = z.infer<typeof AutoAnimationsSetItemInputSchema>;
 
 export const AutoAnimationsGetAutorecInputSchema = EmptyInputSchema;

@@ -42,6 +42,48 @@ describe("Automated Animations schemas", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects mixing primary and flags in one payload", () => {
+    const result = AutoAnimationsSetItemInputSchema.safeParse({
+      uuid: "Item.abcdefghijklmnopqrstuvwxyz",
+      menu: "range",
+      primary: {
+        menuType: "spell",
+        animation: "firebolt",
+        variant: "01",
+        color: "orange"
+      },
+      flags: { menu: "aura", isCustomized: true }
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects preset on the simplified primary path", () => {
+    const result = AutoAnimationsSetItemInputSchema.safeParse({
+      uuid: "Item.abcdefghijklmnopqrstuvwxyz",
+      menu: "preset",
+      primary: {
+        menuType: "spell",
+        animation: "fireball",
+        variant: "01",
+        color: "orange"
+      }
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts flags-only replace mode for presets", () => {
+    const result = AutoAnimationsSetItemInputSchema.safeParse({
+      uuid: "Item.abcdefghijklmnopqrstuvwxyz",
+      flags: {
+        menu: "preset",
+        presetType: "proToTemp",
+        isCustomized: true,
+        data: { projectile: {}, explosion: {} }
+      }
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("accepts catalog search filters", () => {
     const result = AutoAnimationsSearchCatalogInputSchema.safeParse({
       query: "firebolt",

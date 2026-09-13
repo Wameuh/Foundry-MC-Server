@@ -18,14 +18,22 @@ Les réglages d’item sont écrits au schéma de flags v5 (`isEnabled`,
 Pour le `meleeSwitch`, les défauts suivent A-A (`detect: "automatic"`,
 `returning: false`, `switchType: "on"`).
 
-Versions certifiées : `7.0.0` et `7.0.17`. Toute autre version est refusée
-(`compatible: false`, écritures désactivées).
+Versions certifiées : `7.0.0`, `7.0.17`, `7.0.22`, `7.0.23`, `7.0.24`
+(vérifiée : `7.0.22`). Toute autre version est refusée (`compatible: false`,
+écritures désactivées), y compris `7.1.x` tant qu’elle n’est pas ajoutée à la
+liste.
 
-## Mode `flags` avancé
+## Modes d’écriture (XOR)
 
-Quand `flags` est fourni à `autoanimations_set_item_animation`, l’objet remplace
-`flags.autoanimations` tel quel. Les champs frères `menu` / `isEnabled` ne sont
-pas réinjectés. Seul `version` est complété s’il est absent.
+`autoanimations_set_item_animation` accepte **exactement un** des deux modes :
+
+1. **Primary** — `uuid` + `menu` + `primary` (+ `isEnabled` / `merge` optionnels).
+   Menus : `melee`, `range`, `ontoken`, `templatefx`, `aura`.
+   `preset` est refusé ici : A-A attend `presetType` et une structure `data`
+   spécifique.
+2. **Flags** — `uuid` + `flags` uniquement. Remplace `flags.autoanimations`
+   tel quel (seul `version` est complété s’il manque). Requis pour les presets.
+
 ## Outils MCP
 
 | Outil | Effet |
