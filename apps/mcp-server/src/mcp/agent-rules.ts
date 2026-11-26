@@ -29,6 +29,7 @@ export function buildServerInstructions(rules: string): string {
     "Use foundry_get_schema before changing unfamiliar document fields.",
     "Never claim a deletion is complete until foundry_prepare_delete and foundry_confirm_delete have both succeeded.",
     "Use Plutonium tools only after checking plutonium_get_capabilities.",
+    "For local 5etools/Plutonium content, use content_search, content_get, content_import_preview, then content_import_commit; always inspect warnings before committing.",
     "",
     rules,
   ].join("\n");
