@@ -7,6 +7,7 @@ import { SessionRegistry } from "./bridge/session-registry.js";
 import { attachBridgeWebSocketServer } from "./bridge/websocket-server.js";
 import { loadConfig } from "./config.js";
 import { ConfirmationStore } from "./deletion/confirmation-store.js";
+import { LocalContentCatalog } from "./content/catalog.js";
 import { DirectCredentialStore } from "./foundry-direct/credential-store.js";
 import { DirectRequestRouter } from "./foundry-direct/direct-router.js";
 import { DirectFoundrySupervisor } from "./foundry-direct/supervisor.js";
@@ -31,7 +32,8 @@ async function main(): Promise<void> {
   });
   await direct.start();
   const router = new DirectRequestRouter(direct, audit, config, logger);
-  const dependencies = { router, sessions, capabilities, confirmations };
+  const contentCatalog = config.plutoniumDataPath ? new LocalContentCatalog(config.plutoniumDataPath) : undefined;
+  const dependencies = { router, sessions, capabilities, confirmations, ...(contentCatalog ? { contentCatalog } : {}) };
   const { httpServer, closeMcpHandler } = createHttpServer(config, dependencies, logger);
   const wss = attachBridgeWebSocketServer({ httpServer, config, sessions, pending, capabilities, direct, logger });
 

@@ -4,6 +4,7 @@ import type { BridgeOperationValue } from "@foundry-mcp/protocol";
 import type { CapabilityCache } from "../../bridge/capability-cache.js";
 import type { SessionRegistry } from "../../bridge/session-registry.js";
 import type { ConfirmationStore } from "../../deletion/confirmation-store.js";
+import type { LocalContentCatalog } from "../../content/catalog.js";
 import { errorDetails } from "../../errors.js";
 
 export type OperationRouter = {
@@ -15,6 +16,7 @@ export type ToolDependencies = {
   sessions: SessionRegistry;
   capabilities: CapabilityCache;
   confirmations: ConfirmationStore;
+  contentCatalog?: LocalContentCatalog;
 };
 
 export type ToolRegistrar = (server: McpServer, dependencies: ToolDependencies) => void;

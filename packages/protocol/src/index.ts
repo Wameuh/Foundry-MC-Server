@@ -6,6 +6,7 @@ export * from "./operation-receipt.js";
 export * from "./schemas/common.js";
 export * from "./schemas/compendiums.js";
 export * from "./schemas/context.js";
+export * from "./schemas/content.js";
 export * from "./schemas/deletion.js";
 export * from "./schemas/dnd5e.js";
 export * from "./schemas/documents.js";
