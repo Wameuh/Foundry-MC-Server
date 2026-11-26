@@ -8,6 +8,12 @@ const EnvironmentSchema = z.object({
   FOUNDRY_BRIDGE_SECRET: z.string().min(16),
   TARGET_WORLD_ID: z.string().min(1),
   FOUNDRY_ORIGIN: z.string().url(),
+  FOUNDRY_DIRECT_URL: z.string().url().optional(),
+  FOUNDRY_DIRECT_CREDENTIALS_PATH: z.string().min(1).default("./data/foundry-direct-credentials.json"),
+  AGENTCONTROL_TCP: z.string().min(1).default("127.0.0.1:7331"),
+  AGENTCONTROL_TOKEN_PATH: z.string().min(1).optional(),
+  AGENTCONTROL_WORKSPACE: z.string().min(1).default("/data/agent-workspace"),
+  PLUTONIUM_DATA_PATH: z.string().min(1).optional(),
   AUDIT_LOG_PATH: z.string().min(1).default("./data/audit.jsonl"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   NORMAL_OPERATION_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
@@ -52,6 +58,12 @@ export type AppConfig = {
   bridgeSecret: string;
   targetWorldId: string;
   foundryOrigin: string;
+  foundryDirectUrl: string;
+  foundryDirectCredentialsPath: string;
+  agentControlTcp: string;
+  agentControlTokenPath?: string;
+  agentControlWorkspace: string;
+  plutoniumDataPath?: string;
   auditLogPath: string;
   logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
   normalOperationTimeoutMs: number;
@@ -93,6 +105,12 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     bridgeSecret: value.FOUNDRY_BRIDGE_SECRET,
     targetWorldId: value.TARGET_WORLD_ID,
     foundryOrigin: value.FOUNDRY_ORIGIN,
+    foundryDirectUrl: value.FOUNDRY_DIRECT_URL ?? value.FOUNDRY_ORIGIN,
+    foundryDirectCredentialsPath: value.FOUNDRY_DIRECT_CREDENTIALS_PATH,
+    agentControlTcp: value.AGENTCONTROL_TCP,
+    ...(value.AGENTCONTROL_TOKEN_PATH ? { agentControlTokenPath: value.AGENTCONTROL_TOKEN_PATH } : {}),
+    agentControlWorkspace: value.AGENTCONTROL_WORKSPACE,
+    ...(value.PLUTONIUM_DATA_PATH ? { plutoniumDataPath: value.PLUTONIUM_DATA_PATH } : {}),
     auditLogPath: value.AUDIT_LOG_PATH,
     logLevel: value.LOG_LEVEL,
     normalOperationTimeoutMs: value.NORMAL_OPERATION_TIMEOUT_MS,
