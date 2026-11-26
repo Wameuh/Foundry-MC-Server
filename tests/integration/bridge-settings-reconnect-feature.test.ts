@@ -48,8 +48,8 @@ describe("bridge settings reconnect feature", () => {
     (globalThis as Record<string, unknown>).game = {
       user: { id: "gm", name: "GM", isGM: true },
       world: { id: "world", title: "World" },
-      version: "14.367",
-      system: { id: "dnd5e", version: "5.3.3" },
+      version: "14.370",
+      system: { id: "dnd5e", version: "6.1.1" },
       settings: {
         get: (_module: string, key: string) =>
           key === "bridgeUrl" ? "ws://127.0.0.1:3210/foundry-mcp/bridge" : key === "bridgeSecret" ? "secret" : false,

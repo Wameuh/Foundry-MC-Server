@@ -4,7 +4,6 @@ import { AgentControlDaemonClient } from "./agentcontrol/daemon-client.js";
 import { AgentControlSlotManager } from "./agentcontrol/slot-manager.js";
 import { AuditLog } from "./audit/audit-log.js";
 import { CapabilityCache } from "./bridge/capability-cache.js";
-import { PendingRequests } from "./bridge/pending-requests.js";
 import { SessionRegistry } from "./bridge/session-registry.js";
 import { attachBridgeWebSocketServer } from "./bridge/websocket-server.js";
 import { loadConfig } from "./config.js";
@@ -20,7 +19,6 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
   const sessions = new SessionRegistry(config.targetWorldId, config.bridgeHeartbeatTimeoutMs, logger);
-  const pending = new PendingRequests();
   const capabilities = new CapabilityCache();
   const confirmations = new ConfirmationStore(config.deleteConfirmationTtlMs);
   const audit = new AuditLog(config.auditLogPath, logger);
@@ -58,7 +56,6 @@ async function main(): Promise<void> {
     httpServer,
     config,
     sessions,
-    pending,
     capabilities,
     direct,
     agentControl,
@@ -76,7 +73,6 @@ async function main(): Promise<void> {
     logger.info({ signal }, "Shutting down Foundry MCP server");
     await direct.stop();
     agentControlDaemon.stop();
-    pending.rejectAll();
     sessions.close();
     wss.close();
     await closeMcpHandler();

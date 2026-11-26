@@ -9,7 +9,6 @@ import WebSocket from "ws";
 import type { AgentControlSlotManager } from "../../apps/mcp-server/src/agentcontrol/slot-manager.js";
 import { computeBridgeHmac } from "../../apps/mcp-server/src/bridge/authentication.js";
 import { CapabilityCache } from "../../apps/mcp-server/src/bridge/capability-cache.js";
-import { PendingRequests } from "../../apps/mcp-server/src/bridge/pending-requests.js";
 import { SessionRegistry } from "../../apps/mcp-server/src/bridge/session-registry.js";
 import { attachBridgeWebSocketServer } from "../../apps/mcp-server/src/bridge/websocket-server.js";
 import type { AppConfig } from "../../apps/mcp-server/src/config.js";
@@ -37,21 +36,9 @@ function testConfig(): AppConfig {
     auditLogPath: "./data/audit.jsonl",
     logLevel: "silent",
     normalOperationTimeoutMs: 1_000,
-    plutoniumOperationTimeoutMs: 1_000,
     bridgeHeartbeatTimeoutMs: 10_000,
     deleteConfirmationTtlMs: 1_000,
     maxJsonBodyBytes: 1024 * 1024,
-    headlessBrowser: {
-      enabled: false,
-      foundryUrl: foundryOrigin,
-      bridgeUrl: "ws://127.0.0.1/foundry-mcp/bridge",
-      chromiumPath: "/usr/bin/chromium",
-      profilePath: "./data/chromium-profile",
-      chromiumNoSandbox: false,
-      readyTimeoutMs: 30_000,
-      retryMs: 1_000,
-      bridgeGraceMs: 5_000
-    }
   };
 }
 
@@ -117,7 +104,6 @@ describe("AgentControl websocket routing", () => {
     httpServer = createServer();
     const logger = pino({ level: "silent" });
     const sessions = new SessionRegistry(worldId, 10_000, logger);
-    const pending = new PendingRequests();
     const capabilities = new CapabilityCache();
     const handled: unknown[] = [];
     const registerClient = vi.fn(() => () => undefined);
@@ -134,7 +120,6 @@ describe("AgentControl websocket routing", () => {
       httpServer,
       config: testConfig(),
       sessions,
-      pending,
       capabilities,
       agentControl,
       logger

@@ -1,4 +1,4 @@
-import type { BridgeRegistration, BridgeRequest } from "@foundry-mcp/protocol";
+import type { BridgeRegistration } from "@foundry-mcp/protocol";
 import type { WebSocket } from "ws";
 
 export class BridgeSession {
@@ -27,11 +27,6 @@ export class BridgeSession {
 
   isOpen(): boolean {
     return this.socket.readyState === 1;
-  }
-
-  sendRequest(request: BridgeRequest): void {
-    if (!this.isOpen()) throw new Error("Foundry bridge is disconnected");
-    this.socket.send(JSON.stringify({ type: "request", request }));
   }
 
   send(message: unknown): void {

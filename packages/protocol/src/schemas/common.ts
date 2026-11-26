@@ -65,9 +65,7 @@ export type SafeJsonObject = z.infer<typeof SafeJsonObjectSchema>;
 
 export const NonEmptyIdentifierSchema = z.string().trim().min(1).max(255);
 export const UuidSchema = z.string().trim().min(3).max(1024);
-export const RequestIdSchema = z.string().trim().min(8).max(128);
 export const OperationIdSchema = z.string().trim().min(8).max(128);
-export const IdempotencyKeySchema = z.string().trim().min(8).max(256);
 
 export const DocumentReferenceSchema = z
   .object({

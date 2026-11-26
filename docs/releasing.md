@@ -29,7 +29,7 @@ Créer et pousser le tag correspondant exactement à la version du manifeste :
 
 ```sh
 VERSION="$(node -p "require('./apps/foundry-module/module.json').version")"
-git tag -a "v${VERSION}" -m "Foundry MCP Bridge v${VERSION}"
+git tag -a "v${VERSION}" -m "Foundry MCP Agent v${VERSION}"
 git push origin "v${VERSION}"
 ```
 

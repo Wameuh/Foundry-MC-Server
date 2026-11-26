@@ -3,21 +3,17 @@ import {
   AgentControlServerMessageSchema,
   type AgentControlServerMessage,
   type BridgeRegistration,
-  type BridgeRequest,
 } from "@foundry-mcp/protocol";
 import { createChallengeHmac } from "./authenticate";
-import { dispatchRequest } from "./dispatcher";
 import { Heartbeat } from "./heartbeat";
 import { ReconnectBackoff } from "./reconnect";
 import { readSettings, type BridgeSettings } from "../settings/read-settings";
-import { getPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
 
 type ServerMessage =
   | { type: "auth.challenge"; nonce: string; issuedAt: number }
   | { type: "auth.accepted" }
   | { type: "registered" }
   | { type: "control.provisioned"; ok: boolean; error?: string }
-  | { type: "request"; request: BridgeRequest }
   | { type: "ping" | "pong"; timestamp: number }
   | AgentControlServerMessage;
 
@@ -103,12 +99,12 @@ export class BridgeClient {
     const socket = new WebSocket(settings.bridgeUrl);
     this.socket = socket;
     socket.addEventListener("open", () => this.debug(settings, "WebSocket connected; awaiting challenge."));
-    socket.addEventListener("message", (event) => void this.onMessage(event, settings));
+    socket.addEventListener("message", (event) => this.onMessage(event, settings));
     socket.addEventListener("close", (event) => this.onClose(settings, socket, event));
     socket.addEventListener("error", () => this.debug(settings, "WebSocket error."));
   }
 
-  private async onMessage(event: MessageEvent, settings: BridgeSettings): Promise<void> {
+  private onMessage(event: MessageEvent, settings: BridgeSettings): void {
     this.heartbeat.touch();
     let message: ServerMessage;
     try {
@@ -142,11 +138,6 @@ export class BridgeClient {
         if (message.ok) ui.notifications?.info("Foundry MCP: backend service account provisioned.");
         else ui.notifications?.error(`Foundry MCP: backend provisioning failed: ${message.error ?? "unknown error"}`);
         break;
-      case "request": {
-        const response = await dispatchRequest(message.request);
-        this.send({ type: "response", response });
-        break;
-      }
       case "pong":
         break;
       case "ping":
@@ -201,37 +192,13 @@ export class BridgeClient {
 }
 
 function createRegistration(): BridgeRegistration {
-  const plutonium = getPlutoniumCapabilities();
   return {
     bridgeVersion: APPLICATION_VERSION,
     world: { id: game.world?.id ?? "", title: game.world?.title ?? "" },
     user: { id: game.user?.id ?? "", name: game.user?.name ?? "", isGM: true },
     foundry: { version: game.version },
     system: { id: game.system.id, version: game.system.version },
-    modules: {
-      plutonium: {
-        active: plutonium.active,
-        ...(plutonium.version ? { version: plutonium.version } : {}),
-        compatible: plutonium.compatible,
-      },
-    },
-    capabilities: [
-      "foundry.documents.read",
-      "foundry.status",
-      "foundry.context",
-      "foundry.schema",
-      "foundry.documents.create",
-      "foundry.documents.update",
-      "foundry.documents.delete",
-      "foundry.embedded.create",
-      "foundry.embedded.update",
-      "foundry.compendiums.search",
-      "foundry.compendiums.import",
-      "dnd5e.character.build",
-      "plutonium.capabilities",
-      ...(plutonium.importJson ? ["plutonium.import.json"] : []),
-      ...(plutonium.importReference ? ["plutonium.import.reference"] : []),
-    ],
+    capabilities: ["foundry.control.provision", "agentcontrol.control"],
   };
 }
 

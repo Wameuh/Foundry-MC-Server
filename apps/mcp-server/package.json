@@ -20,7 +20,6 @@
     "@modelcontextprotocol/server": "^2.0.0",
     "express": "^5.1.0",
     "pino": "^9.9.0",
-    "playwright-core": "^1.55.0",
     "ws": "^8.18.3",
     "zod": "^4.1.11"
   },
