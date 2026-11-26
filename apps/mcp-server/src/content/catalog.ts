@@ -24,6 +24,8 @@ const COLLECTION_KEYS: Record<ContentKind, string> = {
 export class LocalContentCatalog {
   private readonly cache = new Map<ContentKind, Promise<ContentEntry[]>>();
   private readonly overlayCache = new Map<ContentKind, Promise<JsonRecord[]>>();
+  private readonly resolvedEntries = new Map<ContentKind, ContentEntry[]>();
+  private readonly resolvedOverlays = new Map<ContentKind, JsonRecord[]>();
 
   constructor(private readonly rootPath: string) {}
 
@@ -67,10 +69,29 @@ export class LocalContentCatalog {
     };
   }
 
+  async warm(kind: ContentKind): Promise<void> {
+    await Promise.all([this.entries(kind), this.overlays(kind)]);
+  }
+
+  getCached(input: { kind: ContentKind; name: string; source?: string | undefined }): { entry: ContentEntry; foundryOverlay?: JsonRecord } | undefined {
+    const entries = this.resolvedEntries.get(input.kind);
+    if (!entries) return undefined;
+    const name = input.name.trim().toLocaleLowerCase();
+    const source = input.source?.trim().toLocaleLowerCase();
+    const matches = entries.filter((entry) => entry.name.toLocaleLowerCase() === name && (!source || entry.source.toLocaleLowerCase() === source));
+    const entry = matches.length === 1 || source ? matches[0] : matches.find((candidate) => candidate.source === "PHB") ?? matches[0];
+    if (!entry) return undefined;
+    const overlay = (this.resolvedOverlays.get(input.kind) ?? []).find((candidate) =>
+      typeof candidate["name"] === "string" && candidate["name"].toLocaleLowerCase() === entry.name.toLocaleLowerCase() &&
+      String(candidate["source"] ?? "").toLocaleLowerCase() === entry.source.toLocaleLowerCase()
+    );
+    return { entry, ...(overlay ? { foundryOverlay: overlay } : {}) };
+  }
+
   private entries(kind: ContentKind): Promise<ContentEntry[]> {
     const existing = this.cache.get(kind);
     if (existing) return existing;
-    const promise = this.loadEntries(kind);
+    const promise = this.loadEntries(kind).then((loaded) => { this.resolvedEntries.set(kind, loaded); return loaded; });
     this.cache.set(kind, promise);
     return promise;
   }
@@ -78,7 +99,7 @@ export class LocalContentCatalog {
   private overlays(kind: ContentKind): Promise<JsonRecord[]> {
     const existing = this.overlayCache.get(kind);
     if (existing) return existing;
-    const promise = this.loadOverlays(kind);
+    const promise = this.loadOverlays(kind).then((loaded) => { this.resolvedOverlays.set(kind, loaded); return loaded; });
     this.overlayCache.set(kind, promise);
     return promise;
   }

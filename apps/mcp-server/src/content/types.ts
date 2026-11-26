@@ -6,6 +6,7 @@ export type ConversionInput = {
   kind: ContentKind;
   entry: JsonRecord;
   foundryOverlay?: JsonRecord;
+  resolveSpell?: ((name: string, source?: string | undefined) => { entry: JsonRecord; foundryOverlay?: JsonRecord } | undefined) | undefined;
 };
 
 export type ConversionResult = {

@@ -9,10 +9,15 @@ const catalog = new LocalContentCatalog(DATA_PATH);
 
 async function convert(kind: "spell" | "item" | "creature", name: string, source: string) {
   const { entry, foundryOverlay } = await catalog.get({ kind, name, source });
+  await catalog.warm("spell");
   return convertContentEntry({
     kind,
     entry: entry.raw,
-    ...(foundryOverlay ? { foundryOverlay } : {})
+    ...(foundryOverlay ? { foundryOverlay } : {}),
+    resolveSpell: (spellName, spellSource) => {
+      const found = catalog.getCached({ kind: "spell", name: spellName, ...(spellSource ? { source: spellSource } : {}) });
+      return found ? { entry: found.entry.raw, ...(found.foundryOverlay ? { foundryOverlay: found.foundryOverlay } : {}) } : undefined;
+    }
   });
 }
 
@@ -73,4 +78,56 @@ describe("content converters against real Plutonium data", () => {
     expect(features.every((feature) => feature["type"] === "feat")).toBe(true);
     expect(features.some((feature) => feature["name"] === "Claws")).toBe(true);
   });
+  it("converts the Mage spellcasting trait and resolves its prepared spell items", async () => {
+    const result = await convert("creature", "Mage", "MM");
+    const doc = result.document;
+    const data = system(result);
+    const items = doc["items"] as JsonRecord[];
+    const spellcastingFeature = items.find((item) => item["name"] === "Spellcasting" && item["type"] === "feat");
+    expect(spellcastingFeature).toBeDefined();
+    const featureDescription = String(((spellcastingFeature as JsonRecord)["system"] as JsonRecord)["description"] && ((((spellcastingFeature as JsonRecord)["system"] as JsonRecord)["description"] as JsonRecord)["value"]));
+    expect(featureDescription).toContain("Cantrips");
+    expect(featureDescription).toContain("3rd level");
+    expect(featureDescription).not.toContain("{@");
+    const spells = items.filter((item) => item["type"] === "spell");
+    expect(spells.length).toBe(16);
+    const fireball = spells.find((item) => item["name"] === "Fireball");
+    expect(fireball).toBeDefined();
+    expect(((fireball as JsonRecord)["system"] as JsonRecord)["level"]).toBe(3);
+    expect(((fireball as JsonRecord)["system"] as JsonRecord)["method"]).toBe("spell");
+    expect(((fireball as JsonRecord)["system"] as JsonRecord)["prepared"]).toBe(1);
+    const fireBolt = spells.find((item) => item["name"] === "Fire Bolt");
+    expect(((fireBolt as JsonRecord)["system"] as JsonRecord)["prepared"]).toBe(2);
+    expect((data["attributes"] as JsonRecord)["spellcasting"]).toBe("int");
+    expect(result.warnings.some((warning) => warning.includes("not imported in converter v1"))).toBe(false);
+  });
+
+  it("converts daily innate spellcasting with innate preparation", async () => {
+    const result = await convert("creature", "Barlgura", "MM");
+    const items = result.document["items"] as JsonRecord[];
+    expect(items.some((item) => item["name"] === "Innate Spellcasting" && item["type"] === "feat")).toBe(true);
+    const entangle = items.find((item) => item["name"] === "Entangle" && item["type"] === "spell");
+    expect(entangle).toBeDefined();
+    expect(((entangle as JsonRecord)["system"] as JsonRecord)["method"]).toBe("innate");
+    expect(((entangle as JsonRecord)["system"] as JsonRecord)["prepared"]).toBe(2);
+  });
+
+  it("keeps unresolved spellcasting entries as placeholders with explicit warnings", async () => {
+    const { entry } = await catalog.get({ kind: "creature", name: "Acolyte", source: "MM" });
+    const raw = JSON.parse(JSON.stringify(entry.raw)) as JsonRecord;
+    (((raw["spellcasting"] as JsonRecord[])[0]?.["spells"] as JsonRecord)["0"] as JsonRecord)["spells"] = ["{@spell definitely not a real spell}"];
+    await catalog.warm("spell");
+    const result = convertContentEntry({
+      kind: "creature",
+      entry: raw,
+      resolveSpell: (spellName, spellSource) => {
+        const found = catalog.getCached({ kind: "spell", name: spellName, ...(spellSource ? { source: spellSource } : {}) });
+        return found ? { entry: found.entry.raw, ...(found.foundryOverlay ? { foundryOverlay: found.foundryOverlay } : {}) } : undefined;
+      }
+    });
+    const items = result.document["items"] as JsonRecord[];
+    expect(items.some((item) => item["name"] === "definitely not a real spell" && item["type"] === "spell")).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("definitely not a real spell") && warning.includes("not found"))).toBe(true);
+  });
+
 });

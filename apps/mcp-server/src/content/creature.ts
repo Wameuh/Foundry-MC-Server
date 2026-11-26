@@ -1,6 +1,7 @@
 import { asArray, asRecord, number, slugify, stableId, text } from "./json.js";
 import { applyFoundryOverlay } from "./overlays.js";
-import { render5etoolsBlocks } from "./tag-renderer.js";
+import { convertSpell } from "./spell.js";
+import { render5etoolsBlocks, render5etoolsText } from "./tag-renderer.js";
 import { CONTENT_CONVERTER_VERSION, type ConversionInput, type ConversionResult, type JsonRecord } from "./types.js";
 
 const SIZES: Record<string, string> = { T: "tiny", S: "sm", M: "med", L: "lg", H: "huge", G: "grg" };
@@ -214,6 +215,133 @@ function features(entry: JsonRecord, name: string, source: string, warnings: str
   );
 }
 
+type SpellReference = { raw: string; name: string; source?: string | undefined; note: string };
+type EmbeddedSpell = SpellReference & { level: number; method: string; prepared: number; groupLabel: string };
+
+function parseSpellReference(rawValue: unknown): SpellReference | undefined {
+  const raw = text(rawValue).trim();
+  const match = raw.match(/\{@spell\s+([^}|]+)(?:\|([^}|]+))?(?:\|([^}]+))?\}(.*)/i);
+  if (!match) return undefined;
+  const name = (match[1] ?? "").replace(/\*+\s*$/, "").trim();
+  if (!name) return undefined;
+  const second = (match[2] ?? "").trim();
+  const third = (match[3] ?? "").trim();
+  const trailing = (match[4] ?? "").trim();
+  const source = /^[A-Z0-9]{2,12}$/i.test(second) ? second.toUpperCase() : undefined;
+  const note = [source ? third : second, trailing].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  return { raw, name, ...(source ? { source } : {}), note };
+}
+
+function ordinal(level: number): string {
+  return level === 1 ? "1st" : level === 2 ? "2nd" : level === 3 ? "3rd" : `${level}th`;
+}
+
+function spellReferences(entries: unknown): SpellReference[] {
+  return asArray(entries).map(parseSpellReference).filter((entry): entry is SpellReference => Boolean(entry));
+}
+
+function formatReferenceList(refs: SpellReference[]): string {
+  return refs.map((ref) => render5etoolsText(ref.raw)).join(", ");
+}
+
+function spellcastingBlocks(entry: JsonRecord, creatureName: string, source: string, input: ConversionInput, warnings: string[]): { features: JsonRecord[]; spells: JsonRecord[] } {
+  const featuresOut: JsonRecord[] = [];
+  const spellsOut: JsonRecord[] = [];
+  const seenSpells = new Set<string>();
+  for (const [blockIndex, blockValue] of asArray(entry["spellcasting"]).entries()) {
+    const block = asRecord(blockValue);
+    if (!block) continue;
+    const blockName = text(block["name"], "Spellcasting");
+    const embedded: EmbeddedSpell[] = [];
+    const listParts: string[] = [];
+    const addGroup = (refs: SpellReference[], label: string, level: number, method: string, prepared: number): void => {
+      if (!refs.length) return;
+      listParts.push(`<p><strong>${label}:</strong> ${formatReferenceList(refs)}</p>`);
+      for (const ref of refs) embedded.push({ ...ref, level, method, prepared, groupLabel: label });
+    };
+    addGroup(spellReferences(block["will"]), "At will", 0, "atwill", 2);
+    const daily = asRecord(block["daily"]) ?? {};
+    for (const key of Object.keys(daily).sort()) {
+      const times = /^(\d+)/.exec(key)?.[1] ?? "1";
+      addGroup(spellReferences(daily[key]), `${times}/day each`, 0, "innate", 2);
+    }
+    const levels = asRecord(block["spells"]) ?? {};
+    for (const levelKey of Object.keys(levels).sort((a, b) => Number(a) - Number(b))) {
+      const level = Number(levelKey);
+      const levelData = asRecord(levels[levelKey]) ?? {};
+      const slots = number(levelData["slots"], 0);
+      const label = level === 0 ? "Cantrips (at will)" : `${ordinal(level)} level${slots ? ` (${slots} slots)` : ""}`;
+      addGroup(spellReferences(levelData["spells"]), label, level, "spell", level === 0 ? 2 : 1);
+    }
+    const header = render5etoolsBlocks(asArray(block["headerEntries"]), warnings);
+    const footer = render5etoolsBlocks(asArray(block["footerEntries"]), warnings);
+    const description = [header, ...listParts, footer].filter(Boolean).join("\n");
+    const id = stableId("creature-spellcasting", creatureName, source, blockName, blockIndex);
+    featuresOut.push({
+      _id: id,
+      name: blockName,
+      type: "feat",
+      img: "systems/dnd5e/icons/svg/items/feature.svg",
+      system: {
+        description: { value: description, chat: description },
+        identifier: slugify(blockName),
+        source: { book: source, custom: source, rules: "2014" },
+        type: { value: "monster", subtype: "spellcasting" },
+        requirements: null,
+        properties: [],
+        uses: { spent: 0, recovery: [] }
+      },
+      flags: { "foundry-mcp-bridge": { contentImport: { kind: "creature-spellcasting", creature: creatureName, source, converterVersion: CONTENT_CONVERTER_VERSION } } }
+    });
+    for (const ref of embedded) {
+      const key = `${ref.name.toLocaleLowerCase()}|${ref.method}|${ref.level}`;
+      if (seenSpells.has(key)) continue;
+      seenSpells.add(key);
+      const resolved = input.resolveSpell?.(ref.name, ref.source);
+      let spell: JsonRecord;
+      if (resolved) {
+        const converted = convertSpell({ kind: "spell", entry: resolved.entry, ...(resolved.foundryOverlay ? { foundryOverlay: resolved.foundryOverlay } : {}) });
+        spell = converted.document;
+        for (const warning of converted.warnings) warnings.push(`Spell ${ref.name}: ${warning}`);
+      } else {
+        warnings.push(`Creature spellcasting warning: spell ${ref.name} was not found in the local spell catalog; imported as a reference-only placeholder`);
+        spell = {
+          name: ref.name,
+          type: "spell",
+          img: "systems/dnd5e/icons/svg/schools/abjuration.svg",
+          system: {
+            description: { value: `<p>${render5etoolsText(ref.raw)}</p>`, chat: `<p>${render5etoolsText(ref.raw)}</p>` },
+            identifier: slugify(ref.name),
+            source: { custom: source, rules: "2014" },
+            level: ref.level,
+            school: "abj",
+            activation: { type: "action", value: 1 },
+            duration: { units: "inst" },
+            range: { units: "self" },
+            materials: { value: "", consumed: false, cost: 0, supply: 0 },
+            properties: []
+          }
+        };
+      }
+      const spellSystem = asRecord(spell["system"]) ?? {};
+      spellSystem["method"] = ref.method;
+      spellSystem["prepared"] = ref.prepared;
+      spell["system"] = spellSystem;
+      const existingFlags = asRecord(spell["flags"]) ?? {};
+      const existingBridge = asRecord(existingFlags["foundry-mcp-bridge"]) ?? {};
+      spell["flags"] = {
+        ...existingFlags,
+        "foundry-mcp-bridge": {
+          ...existingBridge,
+          creatureSpellcasting: { creature: creatureName, block: blockName, group: ref.groupLabel, ...(ref.note ? { note: ref.note } : {}) }
+        }
+      };
+      spellsOut.push(spell);
+    }
+  }
+  return { features: featuresOut, spells: spellsOut };
+}
+
 export function convertCreature(input: ConversionInput): ConversionResult {
   const warnings: string[] = [];
   const entry = input.entry;
@@ -229,9 +357,7 @@ export function convertCreature(input: ConversionInput): ConversionResult {
   if (asRecord(acEntry)?.["from"]) warnings.push("Creature approximation: armor sources in the AC line were flattened to a fixed natural AC value");
   const hp = asRecord(entry["hp"]) ?? {};
   const spellcasting = asArray(entry["spellcasting"]);
-  if (spellcasting.length) {
-    warnings.push(`Creature warning: ${spellcasting.length} spellcasting entr${spellcasting.length === 1 ? "y" : "ies"} found; spellcasting is not imported in converter v1`);
-  }
+
   const resistanceDamageTypes = DAMAGE_TYPES;
   const baseSystem: JsonRecord = {
     abilities: Object.fromEntries(["str", "dex", "con", "int", "wis", "cha"].map((ability) => [ability, {
@@ -252,7 +378,7 @@ export function convertCreature(input: ConversionInput): ConversionResult {
       },
       movement: movement(entry["speed"]),
       senses: senses(entry["senses"]),
-      spellcasting: "",
+      spellcasting: text(asRecord(asArray(entry["spellcasting"])[0])?.["ability"]),
       exhaustion: 0,
       spell: { level: 0 }
     },
@@ -285,7 +411,8 @@ export function convertCreature(input: ConversionInput): ConversionResult {
   };
   if (!SIZES[sizeKey]) warnings.push(`Creature approximation: unknown size ${sizeKey}; defaulted to medium`);
   const overlaid = applyFoundryOverlay(baseSystem, input.foundryOverlay, warnings);
-  const embeddedFeatures = features(entry, name, source, warnings);
+  const spellcastingContent = spellcastingBlocks(entry, name, source, input, warnings);
+  const embeddedFeatures = [...features(entry, name, source, warnings), ...spellcastingContent.features, ...spellcastingContent.spells];
   const prototypeToken = asRecord(input.foundryOverlay?.["prototypeToken"]);
   const type = creatureType(entry["type"]);
   const creatureIcons: Record<string, string> = {

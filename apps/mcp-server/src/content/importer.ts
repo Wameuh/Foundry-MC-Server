@@ -93,9 +93,15 @@ export class ContentImporter {
       name: input.name,
       ...(input.source ? { source: input.source } : {})
     });
+    await this.catalog.warm("spell");
+    const resolveSpell = (spellName: string, spellSource?: string | undefined) => {
+      const found = this.catalog.getCached({ kind: "spell", name: spellName, ...(spellSource ? { source: spellSource } : {}) });
+      return found ? { entry: found.entry.raw, ...(found.foundryOverlay ? { foundryOverlay: found.foundryOverlay } : {}) } : undefined;
+    };
     const conversion = convertContentEntry({
       kind: input.kind,
       entry: cloneJson(entry.raw),
+      resolveSpell,
       ...(foundryOverlay ? { foundryOverlay: cloneJson(foundryOverlay) } : {})
     });
     return conversion;
