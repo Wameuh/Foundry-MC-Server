@@ -3,21 +3,26 @@ import { MODULE_ID } from "../settings/register-settings";
 export const ASSISTANT_USER_NAME = "MCP Bridge GM";
 
 type ExistingUser = { isFullGamemaster: boolean };
+type ServiceAccountCredentials = { userId: string; username: string; password: string };
+type ServiceAccountSender = { sendServiceAccountProvision(credentials: ServiceAccountCredentials): void };
 
 export interface AssistantProvisioningGateway {
   isFullGamemaster(): boolean;
   isEnabled(): boolean;
   findUser(name: string): ExistingUser | undefined;
   confirmCreation(name: string): Promise<boolean>;
-  createGamemaster(name: string, accessKey: string): Promise<void>;
-  showCredentials(configuration: string): Promise<void>;
+  createGamemaster(name: string, accessKey: string): Promise<string>;
+  sendServiceAccount(credentials: ServiceAccountCredentials): boolean;
+  notifyProvisioned(): void;
   disable(): Promise<void>;
   warn(message: string): void;
   error(message: string): void;
   generateAccessKey(): string;
 }
 
-export async function provisionAssistantAccount(gateway: AssistantProvisioningGateway): Promise<"created" | "dismissed" | "skipped"> {
+export async function provisionAssistantAccount(
+  gateway: AssistantProvisioningGateway
+): Promise<"created" | "dismissed" | "skipped"> {
   if (!gateway.isFullGamemaster() || !gateway.isEnabled()) return "skipped";
 
   const existing = gateway.findUser(ASSISTANT_USER_NAME);
@@ -36,9 +41,13 @@ export async function provisionAssistantAccount(gateway: AssistantProvisioningGa
 
   const accessKey = gateway.generateAccessKey();
   try {
-    await gateway.createGamemaster(ASSISTANT_USER_NAME, accessKey);
+    const userId = await gateway.createGamemaster(ASSISTANT_USER_NAME, accessKey);
+    if (!userId) throw new Error("Foundry did not return the created user id");
+    if (!gateway.sendServiceAccount({ userId, username: ASSISTANT_USER_NAME, password: accessKey })) {
+      throw new Error("the backend control channel is unavailable");
+    }
     await gateway.disable();
-    await gateway.showCredentials(buildHeadlessEnvironment(ASSISTANT_USER_NAME, accessKey));
+    gateway.notifyProvisioned();
     return "created";
   } catch (error) {
     gateway.error(`Foundry MCP: unable to create the assistant account: ${error instanceof Error ? error.message : String(error)}`);
@@ -46,15 +55,7 @@ export async function provisionAssistantAccount(gateway: AssistantProvisioningGa
   }
 }
 
-export function buildHeadlessEnvironment(username: string, accessKey: string): string {
-  return [
-    "FOUNDRY_HEADLESS_ENABLED=true",
-    `FOUNDRY_HEADLESS_USERNAME=${username}`,
-    `FOUNDRY_HEADLESS_ACCESS_KEY=${accessKey}`,
-  ].join("\n");
-}
-
-export function createFoundryProvisioningGateway(): AssistantProvisioningGateway {
+export function createFoundryProvisioningGateway(sender?: ServiceAccountSender): AssistantProvisioningGateway {
   return {
     isFullGamemaster: () => game.user?.role === CONST.USER_ROLES.GAMEMASTER,
     isEnabled: () => game.settings.get(MODULE_ID, "offerAssistantSetup") === true,
@@ -63,13 +64,13 @@ export function createFoundryProvisioningGateway(): AssistantProvisioningGateway
       return user ? { isFullGamemaster: user.role === CONST.USER_ROLES.GAMEMASTER } : undefined;
     },
     confirmCreation: async (name) => foundry.applications.api.DialogV2.confirm({
-      window: { title: "Foundry MCP — assistant account" },
+      window: { title: "Foundry MCP — backend service account" },
       content: [
         `<p>Create the dedicated Foundry user <strong>${escapeHtml(name)}</strong>?</p>`,
-        "<p>This user will have the Gamemaster role so the headless MCP session can manage the world.</p>",
+        "<p>This Gamemaster account is used only by the backend service. Its generated password is transmitted over the authenticated control channel and is never displayed.</p>",
         "<p>No account is created unless you confirm.</p>",
       ].join(""),
-      yes: { label: "Create assistant", icon: "fa-solid fa-robot" },
+      yes: { label: "Create service account", icon: "fa-solid fa-robot" },
       no: { label: "Do not ask again", icon: "fa-solid fa-xmark" },
       modal: true,
       rejectClose: false,
@@ -83,43 +84,15 @@ export function createFoundryProvisioningGateway(): AssistantProvisioningGateway
         password: accessKey,
       }]);
       if (created.length !== 1) throw new Error("Foundry did not return the created user");
+      const user = created[0] as unknown as { id?: unknown; _id?: unknown };
+      return String(user.id ?? user._id ?? "");
     },
-    showCredentials: async (configuration) => {
-      await foundry.applications.api.DialogV2.wait({
-        window: { title: "Foundry MCP — save these credentials" },
-        position: { width: 620 },
-        form: { closeOnSubmit: false },
-        content: [
-          "<p><strong>This access key is shown only once.</strong> Copy this block into the MCP server <code>.env</code> file.</p>",
-          `<textarea readonly style="width:100%;min-height:9rem;font-family:monospace">${escapeHtml(configuration)}</textarea>`,
-        ].join(""),
-        buttons: [{
-          action: "copy",
-          label: "Copy and close",
-          icon: "fa-solid fa-copy",
-          default: true,
-          callback: async (_event: unknown, _button: unknown, dialog: { close(): Promise<unknown> }) => {
-            try {
-              if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
-              await navigator.clipboard.writeText(configuration);
-              ui.notifications?.info("Foundry MCP: headless credentials copied.");
-              await dialog.close();
-            } catch {
-              ui.notifications?.warn("Foundry MCP: automatic copy is unavailable. Select and copy the text manually before closing.");
-            }
-          },
-        }, {
-          action: "close",
-          label: "Close",
-          icon: "fa-solid fa-xmark",
-          callback: async (_event: unknown, _button: unknown, dialog: { close(): Promise<unknown> }) => {
-            await dialog.close();
-          },
-        }],
-        modal: true,
-        rejectClose: false,
-      });
+    sendServiceAccount: (credentials) => {
+      if (!sender) return false;
+      sender.sendServiceAccountProvision(credentials);
+      return true;
     },
+    notifyProvisioned: () => ui.notifications?.info("Foundry MCP: service account sent securely to the backend."),
     disable: async () => { await game.settings.set(MODULE_ID, "offerAssistantSetup", false); },
     warn: (message) => ui.notifications?.warn(message),
     error: (message) => ui.notifications?.error(message),
@@ -130,8 +103,8 @@ export function createFoundryProvisioningGateway(): AssistantProvisioningGateway
   };
 }
 
-export async function offerAssistantAccountProvisioning(): Promise<void> {
-  await provisionAssistantAccount(createFoundryProvisioningGateway());
+export async function offerAssistantAccountProvisioning(sender?: ServiceAccountSender): Promise<void> {
+  await provisionAssistantAccount(createFoundryProvisioningGateway(sender));
 }
 
 function escapeHtml(value: string): string {

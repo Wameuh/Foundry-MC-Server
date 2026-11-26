@@ -138,3 +138,20 @@ export const BridgeHeartbeatSchema = z
 export type BridgeAuthChallenge = z.infer<typeof BridgeAuthChallengeSchema>;
 export type BridgeAuthProof = z.infer<typeof BridgeAuthProofSchema>;
 export type BridgeHeartbeat = z.infer<typeof BridgeHeartbeatSchema>;
+
+export const ServiceAccountProvisionSchema = z
+  .object({
+    userId: NonEmptyIdentifierSchema,
+    username: z.string().trim().min(1).max(512),
+    password: z.string().min(8).max(512)
+  })
+  .strict();
+
+export const ControlProvisionMessageSchema = z
+  .object({
+    type: z.literal("control.provision"),
+    serviceAccount: ServiceAccountProvisionSchema
+  })
+  .strict();
+
+export type ServiceAccountProvision = z.infer<typeof ServiceAccountProvisionSchema>;

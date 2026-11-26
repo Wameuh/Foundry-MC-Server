@@ -24,7 +24,7 @@ export function onReady(): void {
   // also triggered by the automated browser when it configures its profile.
   unsubscribeFromBridgeSettings = subscribeToBridgeSettings(() => bridgeClient?.restart());
 
-  void offerAssistantAccountProvisioning();
+  void offerAssistantAccountProvisioning(bridgeClient);
 }
 
 export function getBridgeClient(): BridgeClient | undefined {

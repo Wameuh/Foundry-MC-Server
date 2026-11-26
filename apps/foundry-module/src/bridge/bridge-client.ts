@@ -9,12 +9,16 @@ import { getPlutoniumCapabilities } from "../integrations/plutonium/capability-p
 type ServerMessage =
   | { type: "auth.challenge"; nonce: string; issuedAt: number }
   | { type: "auth.accepted" }
+  | { type: "registered" }
+  | { type: "control.provisioned"; ok: boolean; error?: string }
   | { type: "request"; request: BridgeRequest }
   | { type: "ping" | "pong"; timestamp: number };
 
 export class BridgeClient {
   private socket: WebSocket | undefined;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private registered = false;
+  private readonly controlQueue: unknown[] = [];
   private stopped = false;
   private readonly backoff = new ReconnectBackoff();
   private readonly heartbeat = new Heartbeat(
@@ -43,6 +47,12 @@ export class BridgeClient {
     this.start();
   }
 
+  sendServiceAccountProvision(serviceAccount: { userId: string; username: string; password: string }): void {
+    const message = { type: "control.provision", serviceAccount };
+    if (this.registered && this.socket?.readyState === WebSocket.OPEN) this.send(message);
+    else this.controlQueue.push(message);
+  }
+
   private connect(): void {
     if (this.stopped || !game.user?.isGM) return;
     const settings = readSettings();
@@ -51,6 +61,7 @@ export class BridgeClient {
       ui.notifications?.error("Foundry MCP: use WSS, or WS only from an HTTP page on a local network.");
       return;
     }
+    this.registered = false;
     const socket = new WebSocket(settings.bridgeUrl);
     this.socket = socket;
     socket.addEventListener("open", () => this.debug(settings, "WebSocket connected; awaiting challenge."));
@@ -77,6 +88,14 @@ export class BridgeClient {
         this.backoff.reset();
         this.heartbeat.start();
         this.send({ type: "register", registration: createRegistration() });
+        break;
+      case "registered":
+        this.registered = true;
+        while (this.controlQueue.length) this.send(this.controlQueue.shift());
+        break;
+      case "control.provisioned":
+        if (message.ok) ui.notifications?.info("Foundry MCP: backend service account provisioned.");
+        else ui.notifications?.error(`Foundry MCP: backend provisioning failed: ${message.error ?? "unknown error"}`);
         break;
       case "request": {
         const response = await dispatchRequest(message.request);

@@ -4,7 +4,8 @@ import {
   BridgeAuthProofSchema,
   BridgeHeartbeatSchema,
   BridgeRegistrationSchema,
-  BridgeResponseSchema
+  BridgeResponseSchema,
+  ControlProvisionMessageSchema
 } from "@foundry-mcp/protocol";
 import type { Logger } from "pino";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
@@ -17,6 +18,7 @@ import type { CapabilityCache } from "./capability-cache.js";
 import type { BridgeSession } from "./bridge-session.js";
 import type { PendingRequests } from "./pending-requests.js";
 import type { SessionRegistry } from "./session-registry.js";
+import type { DirectFoundrySupervisor } from "../foundry-direct/supervisor.js";
 
 type ConnectionState = {
   nonce: string;
@@ -45,6 +47,7 @@ export function attachBridgeWebSocketServer(options: {
   sessions: SessionRegistry;
   pending: PendingRequests;
   capabilities: CapabilityCache;
+  direct?: DirectFoundrySupervisor;
   logger: Logger;
 }): WebSocketServer {
   const wss = new WebSocketServer({ noServer: true, maxPayload: options.config.maxJsonBodyBytes });
@@ -115,6 +118,25 @@ function handleConnection(
       if (isObjectWithType(message, "ping")) {
         BridgeHeartbeatSchema.parse(message);
         state.session.send({ type: "pong", timestamp: Date.now() });
+        return;
+      }
+      if (isObjectWithType(message, "control.provision")) {
+        const provision = ControlProvisionMessageSchema.parse(message);
+        if (!options.direct) throw new Error("Direct backend provisioning is unavailable");
+        void options.direct.provision({
+          worldId: state.session.worldId,
+          userId: provision.serviceAccount.userId,
+          username: provision.serviceAccount.username,
+          password: provision.serviceAccount.password
+        }).then((status) => {
+          state.session?.send({ type: "control.provisioned", ok: true, status });
+        }).catch((error: unknown) => {
+          state.session?.send({
+            type: "control.provisioned",
+            ok: false,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        });
         return;
       }
       if (isObjectWithType(message, "response")) {

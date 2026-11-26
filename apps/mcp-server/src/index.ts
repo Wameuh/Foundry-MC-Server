@@ -33,7 +33,7 @@ async function main(): Promise<void> {
   const router = new DirectRequestRouter(direct, audit, config, logger);
   const dependencies = { router, sessions, capabilities, confirmations };
   const { httpServer, closeMcpHandler } = createHttpServer(config, dependencies, logger);
-  const wss = attachBridgeWebSocketServer({ httpServer, config, sessions, pending, capabilities, logger });
+  const wss = attachBridgeWebSocketServer({ httpServer, config, sessions, pending, capabilities, direct, logger });
 
   httpServer.listen(config.port, config.host);
   await once(httpServer, "listening");
