@@ -5,7 +5,8 @@ import {
   BridgeHeartbeatSchema,
   BridgeRegistrationSchema,
   BridgeResponseSchema,
-  ControlProvisionMessageSchema
+  ControlProvisionMessageSchema,
+  isAgentControlMessage
 } from "@foundry-mcp/protocol";
 import type { Logger } from "pino";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
@@ -19,11 +20,13 @@ import type { BridgeSession } from "./bridge-session.js";
 import type { PendingRequests } from "./pending-requests.js";
 import type { SessionRegistry } from "./session-registry.js";
 import type { DirectFoundrySupervisor } from "../foundry-direct/supervisor.js";
+import type { AgentControlSlotManager } from "../agentcontrol/slot-manager.js";
 
 type ConnectionState = {
   nonce: string;
   authenticatedUserId?: string;
   session?: BridgeSession;
+  unregisterAgentControl?: () => void;
 };
 
 function parseMessage(data: RawData): unknown {
@@ -48,6 +51,7 @@ export function attachBridgeWebSocketServer(options: {
   pending: PendingRequests;
   capabilities: CapabilityCache;
   direct?: DirectFoundrySupervisor;
+  agentControl?: AgentControlSlotManager;
   logger: Logger;
 }): WebSocketServer {
   const wss = new WebSocketServer({ noServer: true, maxPayload: options.config.maxJsonBodyBytes });
@@ -111,10 +115,31 @@ function handleConnection(
         state.session = options.sessions.register(socket, registration);
         options.capabilities.set(registration);
         socket.send(JSON.stringify({ type: "registered" }));
+        if (options.agentControl) {
+          const session = state.session;
+          state.unregisterAgentControl = options.agentControl.registerClient(session.worldId, (message) => {
+            session.send(message);
+          });
+        }
         return;
       }
       if (!state.session) throw new Error("Bridge registration is required");
       state.session.touch();
+      if (isAgentControlMessage(message)) {
+        if (!options.agentControl) throw new Error("AgentControl control plane is unavailable");
+        const session = state.session;
+        void options.agentControl.handleMessage(session.worldId, message, (reply) => {
+          session.send(reply);
+        }).catch((error: unknown) => {
+          options.logger.warn({ error }, "AgentControl control message failed");
+          session.send({
+            type: "agentcontrol.error",
+            code: "INTERNAL_ERROR",
+            message: "AgentControl control message failed"
+          });
+        });
+        return;
+      }
       if (isObjectWithType(message, "ping")) {
         BridgeHeartbeatSchema.parse(message);
         state.session.send({ type: "pong", timestamp: Date.now() });
@@ -155,6 +180,7 @@ function handleConnection(
 
   socket.on("close", () => {
     clearTimeout(authTimer);
+    state.unregisterAgentControl?.();
     if (state.session && options.sessions.clear(state.session)) {
       options.capabilities.clear();
       options.pending.rejectAll();
