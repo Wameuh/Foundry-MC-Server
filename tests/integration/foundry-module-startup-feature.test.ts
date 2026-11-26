@@ -34,7 +34,7 @@ describe("Foundry module startup feature", () => {
     expect(callbacks.has("init")).toBe(true);
 
     callbacks.get("init")?.();
-    expect(register).toHaveBeenCalledTimes(5);
+    expect(register).toHaveBeenCalledTimes(6);
     const bridgeSettings = register.mock.calls
       .filter((call) => call[1] === "bridgeUrl" || call[1] === "bridgeSecret");
     expect(bridgeSettings).toHaveLength(2);

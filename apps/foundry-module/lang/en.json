@@ -8,5 +8,8 @@
   "FOUNDRY_MCP.Settings.Diagnostics.Name": "Diagnostic logging",
   "FOUNDRY_MCP.Settings.Diagnostics.Hint": "Log connection diagnostics. Secrets and payloads are never logged.",
   "FOUNDRY_MCP.Settings.AssistantSetup.Name": "Offer assistant account setup",
-  "FOUNDRY_MCP.Settings.AssistantSetup.Hint": "On the next full-GM login, offer to create the dedicated headless MCP user. Disable this after creation or dismissal."
+  "FOUNDRY_MCP.Settings.AssistantSetup.Hint": "On the next full-GM login, offer to create the dedicated headless MCP user. Disable this after creation or dismissal.",
+  "FOUNDRY_MCP.Settings.AgentControlSelections.Name": "AgentControl selections",
+  "FOUNDRY_MCP.Settings.AgentControlSelections.Hint": "Last agent, model, and permission mode selected for each AgentControl slot.",
+  "FOUNDRY_MCP.SceneControls.AgentControl": "AgentControl"
 }

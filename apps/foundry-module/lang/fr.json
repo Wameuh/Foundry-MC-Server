@@ -8,5 +8,8 @@
   "FOUNDRY_MCP.Settings.Diagnostics.Name": "Journal de diagnostic",
   "FOUNDRY_MCP.Settings.Diagnostics.Hint": "Journaliser la connexion sans inclure les secrets ni les données manipulées.",
   "FOUNDRY_MCP.Settings.AssistantSetup.Name": "Proposer la création du compte assistant",
-  "FOUNDRY_MCP.Settings.AssistantSetup.Hint": "Lors de la prochaine connexion d’un MJ complet, proposer la création du compte MCP headless dédié. Désactivé après création ou refus."
+  "FOUNDRY_MCP.Settings.AssistantSetup.Hint": "Lors de la prochaine connexion d’un MJ complet, proposer la création du compte MCP headless dédié. Désactivé après création ou refus.",
+  "FOUNDRY_MCP.Settings.AgentControlSelections.Name": "Sélections AgentControl",
+  "FOUNDRY_MCP.Settings.AgentControlSelections.Hint": "Dernier agent, modèle et mode de permission choisis pour chaque slot AgentControl.",
+  "FOUNDRY_MCP.SceneControls.AgentControl": "AgentControl"
 }

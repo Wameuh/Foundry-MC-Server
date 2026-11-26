@@ -15,6 +15,7 @@ mkdirSync(stageRoot, { recursive: true });
 mkdirSync(archiveRoot, { recursive: true });
 cpSync('apps/foundry-module/module.json', resolve(stageRoot, 'module.json'));
 cpSync('apps/foundry-module/lang', resolve(stageRoot, 'lang'), { recursive: true });
+cpSync('apps/foundry-module/styles', resolve(stageRoot, 'styles'), { recursive: true });
 cpSync('apps/foundry-module/dist/foundry-mcp.js', resolve(stageRoot, 'foundry-mcp.js'));
 rmSync(archivePath, { force: true });
 execFileSync('zip', ['-rq', archivePath, '.'], { cwd: stageRoot, stdio: 'inherit' });

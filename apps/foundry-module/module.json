@@ -8,6 +8,7 @@
   "download": "https://github.com/Wameuh/Foundry-MC-Server/releases/download/v0.2.4/foundry-mcp-bridge-0.2.4.zip",
   "authors": [{ "name": "Foundry MCP contributors" }],
   "esmodules": ["foundry-mcp.js"],
+  "styles": ["styles/agentcontrol.css"],
   "languages": [
     { "lang": "en", "name": "English", "path": "lang/en.json" },
     { "lang": "fr", "name": "Français", "path": "lang/fr.json" }
