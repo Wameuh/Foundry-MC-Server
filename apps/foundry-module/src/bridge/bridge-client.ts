@@ -1,4 +1,10 @@
-import { APPLICATION_VERSION, type BridgeRegistration, type BridgeRequest } from "@foundry-mcp/protocol";
+import {
+  APPLICATION_VERSION,
+  AgentControlServerMessageSchema,
+  type AgentControlServerMessage,
+  type BridgeRegistration,
+  type BridgeRequest,
+} from "@foundry-mcp/protocol";
 import { createChallengeHmac } from "./authenticate";
 import { dispatchRequest } from "./dispatcher";
 import { Heartbeat } from "./heartbeat";
@@ -12,13 +18,20 @@ type ServerMessage =
   | { type: "registered" }
   | { type: "control.provisioned"; ok: boolean; error?: string }
   | { type: "request"; request: BridgeRequest }
-  | { type: "ping" | "pong"; timestamp: number };
+  | { type: "ping" | "pong"; timestamp: number }
+  | AgentControlServerMessage;
+
+type ServerMessageHandler = (message: AgentControlServerMessage) => void;
+type ConnectionStateHandler = (registered: boolean) => void;
 
 export class BridgeClient {
   private socket: WebSocket | undefined;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private registered = false;
   private readonly controlQueue: unknown[] = [];
+  private readonly serverMessageHandlers = new Set<ServerMessageHandler>();
+  private readonly connectionStateHandlers = new Set<ConnectionStateHandler>();
+  private emittedConnectionState = false;
   private stopped = false;
   private readonly backoff = new ReconnectBackoff();
   private readonly heartbeat = new Heartbeat(
@@ -38,6 +51,8 @@ export class BridgeClient {
     this.heartbeat.stop();
     this.socket?.close(1000, "module shutdown");
     this.socket = undefined;
+    this.registered = false;
+    this.emitConnectionState(false);
   }
 
   /** Restart the bridge using the current module settings. */
@@ -48,9 +63,32 @@ export class BridgeClient {
   }
 
   sendServiceAccountProvision(serviceAccount: { userId: string; username: string; password: string }): void {
-    const message = { type: "control.provision", serviceAccount };
+    this.sendControl({ type: "control.provision", serviceAccount });
+  }
+
+  /**
+   * Send a control-plane message. Messages sent before bridge registration are
+   * queued and transmitted in order as soon as the server accepts registration.
+   */
+  sendControl(message: unknown): void {
     if (this.registered && this.socket?.readyState === WebSocket.OPEN) this.send(message);
     else this.controlQueue.push(message);
+  }
+
+  /** Subscribe to validated agentcontrol.* messages received from the server. */
+  onServerMessage(handler: ServerMessageHandler): () => void {
+    this.serverMessageHandlers.add(handler);
+    return () => this.serverMessageHandlers.delete(handler);
+  }
+
+  /** Subscribe to bridge registration changes. */
+  onConnectionStateChange(handler: ConnectionStateHandler): () => void {
+    this.connectionStateHandlers.add(handler);
+    return () => this.connectionStateHandlers.delete(handler);
+  }
+
+  isRegistered(): boolean {
+    return this.registered && this.socket?.readyState === WebSocket.OPEN;
   }
 
   private connect(): void {
@@ -80,6 +118,12 @@ export class BridgeClient {
       return;
     }
     if (!message || typeof message !== "object" || typeof message.type !== "string") return;
+    if (message.type.startsWith("agentcontrol.")) {
+      const parsed = AgentControlServerMessageSchema.safeParse(message);
+      if (parsed.success) this.dispatchServerMessage(parsed.data);
+      else this.debug(settings, `Ignoring invalid AgentControl message ${message.type}.`);
+      return;
+    }
     switch (message.type) {
       case "auth.challenge":
         this.authenticate(message.nonce, settings);
@@ -92,6 +136,7 @@ export class BridgeClient {
       case "registered":
         this.registered = true;
         while (this.controlQueue.length) this.send(this.controlQueue.shift());
+        this.emitConnectionState(true);
         break;
       case "control.provisioned":
         if (message.ok) ui.notifications?.info("Foundry MCP: backend service account provisioned.");
@@ -127,11 +172,23 @@ export class BridgeClient {
     if (this.socket !== socket) return;
     this.heartbeat.stop();
     this.socket = undefined;
+    this.registered = false;
+    this.emitConnectionState(false);
     if (this.stopped) return;
     const delay = this.backoff.next();
     const reason = event.reason ? ` (${event.reason})` : "";
     this.debug(settings, `WebSocket disconnected with code ${event.code}${reason}; retrying in ${delay}ms.`);
     this.reconnectTimer = setTimeout(() => this.connect(), delay);
+  }
+
+  private dispatchServerMessage(message: AgentControlServerMessage): void {
+    for (const handler of this.serverMessageHandlers) handler(message);
+  }
+
+  private emitConnectionState(registered: boolean): void {
+    if (this.emittedConnectionState === registered) return;
+    this.emittedConnectionState = registered;
+    for (const handler of this.connectionStateHandlers) handler(registered);
   }
 
   private send(message: unknown): void {
