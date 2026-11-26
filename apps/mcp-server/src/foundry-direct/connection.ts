@@ -105,11 +105,15 @@ export class FoundrySocketConnection {
         }
         if (frame.type === "socketEvent" && frame.event === "session") {
           const binding = parseSessionBinding(frame.args);
-          if (binding === null) {
+          // Verified against a live v14 server: an anonymous/unbound socket
+          // receives either `null` or `{sessionId, userId: null}`. Both mean
+          // the authenticated session was NOT bound — only a non-null userId
+          // proves the credentials were accepted.
+          if (!binding?.userId) {
             fail(new Error("Foundry did not bind the authenticated session to the socket"));
             return;
           }
-          if (binding?.userId) this.sessionUserId = binding.userId;
+          this.sessionUserId = binding.userId;
           succeed();
         }
       });

@@ -17,7 +17,7 @@ class FakeFoundryServer {
   url = "";
   private nextId = 1;
 
-  constructor() {
+  constructor(private readonly bindUserId: string | null = "gm-id") {
     this.server = createServer((request, response) => {
       if (request.url === "/api/status") {
         response.writeHead(200, { "content-type": "application/json" });
@@ -90,7 +90,7 @@ class FakeFoundryServer {
       const text = raw.toString();
       if (text === "3") return;
       if (text === "40") {
-        ws.send('42["session",{"sessionId":"fake-session","userId":"gm-id"}]');
+        ws.send(`42["session",{"sessionId":"fake-session","userId":${this.bindUserId === null ? "null" : `"${this.bindUserId}"`}}]`);
         return;
       }
       const frame = parseSocketFrame(text);
@@ -173,6 +173,19 @@ describe("Foundry direct client", () => {
     await client.deleteDocuments("Actor", [String(actorId)]);
     expect(fake.actors.size).toBe(0);
     await client.close();
+  });
+
+  it("rejects a socket bound with userId null (verified live v14 anonymous behavior)", async () => {
+    const fake = new FakeFoundryServer(null);
+    servers.push(fake);
+    await fake.listen();
+    const client = new FoundryDirectClient({
+      foundryUrl: fake.url,
+      credentials: { userId: "gm-id", username: "MCP Bridge GM", password: "secret" },
+      requestTimeoutMs: 2_000,
+      connectTimeoutMs: 2_000
+    });
+    await expect(client.connect()).rejects.toThrow(/did not bind/i);
   });
 
   it("rejects invalid credentials", async () => {

@@ -57,7 +57,8 @@ export function parseSocketFrame(input: unknown): ParsedSocketFrame {
   if (typeof input !== "string") return { type: "binaryOrUnsupported", raw: input };
   if (input === "2") return { type: "ping" };
   if (input === "3") return { type: "pong" };
-  if (input === "40") return { type: "socketConnect" };
+  // Socket.IO connect acknowledgement; v14 may append a payload (`40{"sid":...}`).
+  if (input === "40" || input.startsWith("40{")) return { type: "socketConnect" };
   if (input.startsWith("0")) return { type: "engineOpen", payload: parseEngineOpen(input) };
 
   const eventMatch = input.match(/^42(\d*)(\[.*\])$/s);
