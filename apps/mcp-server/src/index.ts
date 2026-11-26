@@ -1,5 +1,7 @@
 import { once } from "node:events";
 
+import { AgentControlDaemonClient } from "./agentcontrol/daemon-client.js";
+import { AgentControlSlotManager } from "./agentcontrol/slot-manager.js";
 import { AuditLog } from "./audit/audit-log.js";
 import { CapabilityCache } from "./bridge/capability-cache.js";
 import { PendingRequests } from "./bridge/pending-requests.js";
@@ -31,11 +33,37 @@ async function main(): Promise<void> {
     requestTimeoutMs: config.normalOperationTimeoutMs
   });
   await direct.start();
+  const agentControlDaemon = new AgentControlDaemonClient({
+    tcp: config.agentControlTcp,
+    ...(config.agentControlTokenPath ? { tokenPath: config.agentControlTokenPath } : {}),
+    logger
+  });
+  agentControlDaemon.start();
+  const agentControl = new AgentControlSlotManager({
+    daemon: agentControlDaemon,
+    targetWorldId: config.targetWorldId,
+    workspaceRoot: config.agentControlWorkspace,
+    statePath: config.agentControlSlotsPath,
+    serverPort: config.port,
+    mcpBearerToken: config.mcpBearerToken,
+    injectFoundryMcp: config.agentControlInjectFoundryMcp,
+    logger
+  });
+  await agentControl.start();
   const router = new DirectRequestRouter(direct, audit, config, logger);
   const contentCatalog = config.plutoniumDataPath ? new LocalContentCatalog(config.plutoniumDataPath) : undefined;
   const dependencies = { router, sessions, capabilities, confirmations, ...(contentCatalog ? { contentCatalog } : {}) };
   const { httpServer, closeMcpHandler } = createHttpServer(config, dependencies, logger);
-  const wss = attachBridgeWebSocketServer({ httpServer, config, sessions, pending, capabilities, direct, logger });
+  const wss = attachBridgeWebSocketServer({
+    httpServer,
+    config,
+    sessions,
+    pending,
+    capabilities,
+    direct,
+    agentControl,
+    logger
+  });
 
   httpServer.listen(config.port, config.host);
   await once(httpServer, "listening");
@@ -47,6 +75,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     logger.info({ signal }, "Shutting down Foundry MCP server");
     await direct.stop();
+    agentControlDaemon.stop();
     pending.rejectAll();
     sessions.close();
     wss.close();

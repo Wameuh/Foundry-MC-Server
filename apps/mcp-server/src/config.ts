@@ -13,6 +13,8 @@ const EnvironmentSchema = z.object({
   AGENTCONTROL_TCP: z.string().min(1).default("127.0.0.1:7331"),
   AGENTCONTROL_TOKEN_PATH: z.string().min(1).optional(),
   AGENTCONTROL_WORKSPACE: z.string().min(1).default("/data/agent-workspace"),
+  AGENTCONTROL_SLOTS_PATH: z.string().min(1).default("./data/agentcontrol-slots.json"),
+  AGENTCONTROL_INJECT_FOUNDRY_MCP: z.enum(["true", "false"]).default("false"),
   PLUTONIUM_DATA_PATH: z.string().min(1).optional(),
   AUDIT_LOG_PATH: z.string().min(1).default("./data/audit.jsonl"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
@@ -63,6 +65,8 @@ export type AppConfig = {
   agentControlTcp: string;
   agentControlTokenPath?: string;
   agentControlWorkspace: string;
+  agentControlSlotsPath: string;
+  agentControlInjectFoundryMcp: boolean;
   plutoniumDataPath?: string;
   auditLogPath: string;
   logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
@@ -110,6 +114,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     agentControlTcp: value.AGENTCONTROL_TCP,
     ...(value.AGENTCONTROL_TOKEN_PATH ? { agentControlTokenPath: value.AGENTCONTROL_TOKEN_PATH } : {}),
     agentControlWorkspace: value.AGENTCONTROL_WORKSPACE,
+    agentControlSlotsPath: value.AGENTCONTROL_SLOTS_PATH,
+    agentControlInjectFoundryMcp: value.AGENTCONTROL_INJECT_FOUNDRY_MCP === "true",
     ...(value.PLUTONIUM_DATA_PATH ? { plutoniumDataPath: value.PLUTONIUM_DATA_PATH } : {}),
     auditLogPath: value.AUDIT_LOG_PATH,
     logLevel: value.LOG_LEVEL,
