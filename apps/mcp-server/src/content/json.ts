@@ -31,10 +31,22 @@ export function boolean(value: unknown): boolean {
   return value === true;
 }
 
+const LATIN_ACCENTS: Record<string, string> = {
+  "à": "a", "á": "a", "â": "a", "ä": "a", "ã": "a", "å": "a",
+  "ç": "c",
+  "è": "e", "é": "e", "ê": "e", "ë": "e",
+  "ì": "i", "í": "i", "î": "i", "ï": "i",
+  "ñ": "n",
+  "ò": "o", "ó": "o", "ô": "o", "ö": "o", "õ": "o", "ø": "o",
+  "ù": "u", "ú": "u", "û": "u", "ü": "u",
+  "ý": "y", "ÿ": "y",
+  "æ": "ae", "œ": "oe"
+};
+
 export function slugify(value: string): string {
-  const slug = value.normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+  const slug = value
     .toLocaleLowerCase()
+    .replace(/[àáâäãåçèéêëìíîïñòóôöõøùúûüýÿæœ]/g, (character) => LATIN_ACCENTS[character] ?? character)
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "imported-content";
