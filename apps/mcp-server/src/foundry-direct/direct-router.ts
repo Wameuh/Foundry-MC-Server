@@ -65,11 +65,23 @@ export class DirectRequestRouter {
   private async execute(operation: BridgeOperationValue, payload: unknown, operationId: string): Promise<unknown> {
     const operations = this.direct.operations;
     switch (operation) {
-      case BridgeOperation.GET_STATUS:
-        return {
-          backend: this.direct.status(),
-          status: await operations.getStatus()
-        };
+      case BridgeOperation.GET_STATUS: {
+        const backend = this.direct.status();
+        try {
+          return {
+            backend,
+            status: await operations.getStatus()
+          };
+        } catch (error) {
+          if (error instanceof AppError && ["FOUNDRY_UNPROVISIONED", "FOUNDRY_DISCONNECTED", "FOUNDRY_WORLD_INACTIVE", "FOUNDRY_UNAVAILABLE"].includes(error.code)) {
+            return {
+              backend: this.direct.status(),
+              status: { connected: false, reason: error.message }
+            };
+          }
+          throw error;
+        }
+      }
       case BridgeOperation.GET_CONTEXT:
         return {
           limited: true,

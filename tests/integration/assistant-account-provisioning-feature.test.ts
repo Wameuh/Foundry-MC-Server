@@ -17,8 +17,9 @@ class FeatureGateway implements AssistantProvisioningGateway {
   isEnabled() { return this.enabled; }
   findUser() { return this.existingIsFullGm === undefined ? undefined : { isFullGamemaster: this.existingIsFullGm }; }
   async confirmCreation(name: string) { this.events.push(`confirm:${name}`); return this.confirmed; }
-  async createGamemaster(name: string, key: string) { this.events.push(`create:${name}:${key}`); }
-  async showCredentials(configuration: string) { this.events.push(`show:${configuration}`); }
+  async createGamemaster(name: string, key: string) { this.events.push(`create:${name}:${key}`); return "service-user-id"; }
+  sendServiceAccount(credentials: { userId: string; username: string; password: string }) { this.events.push(`send:${credentials.userId}:${credentials.username}:${credentials.password}`); return true; }
+  notifyProvisioned() { this.events.push("notify"); }
   async disable() { this.events.push("disable"); this.enabled = false; }
   warn(message: string) { this.events.push(`warn:${message}`); }
   error(message: string) { this.events.push(`error:${message}`); }
@@ -26,7 +27,7 @@ class FeatureGateway implements AssistantProvisioningGateway {
 }
 
 describe("assistant account provisioning feature", () => {
-  it("creates a confirmed GM account and presents one-time server configuration", async () => {
+  it("creates a confirmed GM account and sends it securely to the backend", async () => {
     const gateway = new FeatureGateway();
 
     await expect(provisionAssistantAccount(gateway)).resolves.toBe("created");
@@ -34,11 +35,10 @@ describe("assistant account provisioning feature", () => {
     expect(gateway.events).toEqual([
       `confirm:${ASSISTANT_USER_NAME}`,
       `create:${ASSISTANT_USER_NAME}:generated-access-key`,
+      `send:service-user-id:${ASSISTANT_USER_NAME}:generated-access-key`,
       "disable",
-      expect.stringContaining("show:FOUNDRY_HEADLESS_ENABLED=true")
+      "notify"
     ]);
-    expect(gateway.events.at(-1)).toContain("FOUNDRY_HEADLESS_USERNAME=MCP Bridge GM");
-    expect(gateway.events.at(-1)).toContain("FOUNDRY_HEADLESS_ACCESS_KEY=generated-access-key");
   });
 
   it("does not create a privileged account when the GM declines", async () => {
