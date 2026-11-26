@@ -23,13 +23,17 @@ function rawDataToString(data: RawData): string {
   return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8");
 }
 
-export function buildSocketUrl(foundryUrl: string, sessionId: string, includeLegacySessionParam = false): string {
+/**
+ * Compatibility socket URL: the session travels both in the `?session=`
+ * query parameter (v13 binding) and in the `session` cookie on the upgrade
+ * request (v14 binding). Each generation reads only the form it understands
+ * and ignores the other, so the combination is safe on both.
+ */
+export function buildSocketUrl(foundryUrl: string, sessionId: string): string {
   const origin = new URL(foundryUrl).origin;
   const url = new URL(origin.replace(/^https:/, "wss:").replace(/^http:/, "ws:"));
   url.pathname = "/socket.io/";
-  url.search = includeLegacySessionParam
-    ? `session=${encodeURIComponent(sessionId)}&EIO=4&transport=websocket`
-    : "EIO=4&transport=websocket";
+  url.search = `session=${encodeURIComponent(sessionId)}&EIO=4&transport=websocket`;
   return url.toString();
 }
 

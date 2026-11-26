@@ -24,11 +24,29 @@ class FakeFoundryServer {
         response.end(JSON.stringify({ active: true, version: "14.370" }));
         return;
       }
+      if (request.url === "/join" && request.method === "GET") {
+        // The real server hands out an anonymous session cookie here.
+        response.writeHead(200, {
+          "content-type": "text/html",
+          "set-cookie": "session=fake-session; HttpOnly; Path=/; SameSite=Strict"
+        });
+        response.end("<html>join</html>");
+        return;
+      }
       if (request.url === "/join" && request.method === "POST") {
         let body = "";
         request.on("data", (chunk) => { body += String(chunk); });
         request.on("end", () => {
           const json = JSON.parse(body) as Record<string, unknown>;
+          // v14 rejects auth POSTs without an Origin header or without the
+          // same session cookie continuity as the initial GET.
+          const origin = request.headers.origin;
+          const cookie = request.headers.cookie ?? "";
+          if (!origin || !cookie.includes("session=fake-session")) {
+            response.writeHead(400, { "content-type": "application/json" });
+            response.end(JSON.stringify({ error: "The request could not be processed." }));
+            return;
+          }
           if (json["password"] !== "secret" || json["userid"] !== "gm-id") {
             response.writeHead(200, { "content-type": "application/json" });
             response.end(JSON.stringify({ status: "failed", message: "bad credentials" }));
