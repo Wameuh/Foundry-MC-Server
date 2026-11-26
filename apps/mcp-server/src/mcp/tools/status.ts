@@ -11,8 +11,6 @@ export const registerStatusTool: ToolRegistrar = (server, dependencies) => {
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true }
     },
     async (input) => runTool(async () => {
-      const session = dependencies.sessions.getActive();
-      if (!session) return { connected: false, capabilities: [] };
       const live = await dependencies.router.route(BridgeOperation.GET_STATUS, input, { tool: "foundry_get_status" });
       return { connected: true, registration: dependencies.capabilities.get(), status: live };
     })

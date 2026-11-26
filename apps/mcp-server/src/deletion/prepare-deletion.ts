@@ -2,7 +2,7 @@ import { BridgeOperation, DocumentReferenceSchema, type DocumentReference } from
 import { z } from "zod/v4";
 
 import { AppError } from "../errors.js";
-import type { RequestRouter } from "../bridge/request-router.js";
+import type { OperationRouter } from "../mcp/tools/shared.js";
 import type { ConfirmationStore } from "./confirmation-store.js";
 
 const PreviewSchema = z.object({
@@ -19,7 +19,7 @@ export type PreparedDeletion = {
 };
 
 export async function prepareDeletion(
-  router: RequestRouter,
+  router: OperationRouter,
   confirmations: ConfirmationStore,
   input: { uuids: string[]; reason?: string }
 ): Promise<PreparedDeletion> {

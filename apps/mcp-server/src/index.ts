@@ -3,13 +3,14 @@ import { once } from "node:events";
 import { AuditLog } from "./audit/audit-log.js";
 import { CapabilityCache } from "./bridge/capability-cache.js";
 import { PendingRequests } from "./bridge/pending-requests.js";
-import { RequestRouter } from "./bridge/request-router.js";
 import { SessionRegistry } from "./bridge/session-registry.js";
 import { attachBridgeWebSocketServer } from "./bridge/websocket-server.js";
 import { loadConfig } from "./config.js";
 import { ConfirmationStore } from "./deletion/confirmation-store.js";
+import { DirectCredentialStore } from "./foundry-direct/credential-store.js";
+import { DirectRequestRouter } from "./foundry-direct/direct-router.js";
+import { DirectFoundrySupervisor } from "./foundry-direct/supervisor.js";
 import { createHttpServer } from "./http/create-http-server.js";
-import { HeadlessFoundrySupervisor } from "./headless/headless-supervisor.js";
 import { createLogger } from "./logger.js";
 
 async function main(): Promise<void> {
@@ -20,23 +21,30 @@ async function main(): Promise<void> {
   const capabilities = new CapabilityCache();
   const confirmations = new ConfirmationStore(config.deleteConfirmationTtlMs);
   const audit = new AuditLog(config.auditLogPath, logger);
-  const router = new RequestRouter(sessions, pending, audit, config, logger);
-  const headless = new HeadlessFoundrySupervisor(config, sessions, logger);
+  const credentialStore = new DirectCredentialStore(config.foundryDirectCredentialsPath);
+  const direct = new DirectFoundrySupervisor({
+    foundryUrl: config.foundryDirectUrl,
+    targetWorldId: config.targetWorldId,
+    credentialStore,
+    logger,
+    requestTimeoutMs: config.normalOperationTimeoutMs
+  });
+  await direct.start();
+  const router = new DirectRequestRouter(direct, audit, config, logger);
   const dependencies = { router, sessions, capabilities, confirmations };
-  const { httpServer, closeMcpHandler } = createHttpServer(config, dependencies, logger, headless);
+  const { httpServer, closeMcpHandler } = createHttpServer(config, dependencies, logger);
   const wss = attachBridgeWebSocketServer({ httpServer, config, sessions, pending, capabilities, logger });
 
   httpServer.listen(config.port, config.host);
   await once(httpServer, "listening");
-  logger.info({ host: config.host, port: config.port }, "Foundry MCP server listening");
-  headless.start();
+  logger.info({ host: config.host, port: config.port, directBackend: direct.status() }, "Foundry MCP server listening");
 
   let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info({ signal }, "Shutting down Foundry MCP server");
-    await headless.stop();
+    await direct.stop();
     pending.rejectAll();
     sessions.close();
     wss.close();
