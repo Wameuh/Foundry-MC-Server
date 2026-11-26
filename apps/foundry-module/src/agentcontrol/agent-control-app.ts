@@ -160,6 +160,7 @@ export class AgentControlApp extends applicationV2Base {
       ? snapshot.agents.find((agent) => agent.id === selection.agent)
       : undefined;
     const connected = snapshot.connected;
+    const daemonDegraded = connected && snapshot.agents.length > 0 && snapshot.agents.every((agent) => !agent.available);
     const inputDisabled = connected ? "" : " disabled";
     return `
       ${this.renderErrorBanner()}
@@ -170,6 +171,7 @@ export class AgentControlApp extends applicationV2Base {
         <span class="ac-connection-dot" aria-hidden="true"></span>
         <span>${connected ? "Connected to control plane" : "Disconnected — waiting for bridge registration"}</span>
       </div>
+      ${daemonDegraded ? `<div class="ac-daemon-warning" role="alert">AgentControl daemon appears unavailable — no agent is currently reported as available. Actions may fail until it reconnects.</div>` : ""}
       <section class="ac-config" aria-label="Agent configuration">
         ${this.renderSelect("agent", "Agent", snapshot.agents.map((agent) => ({
           value: agent.id,
@@ -179,7 +181,7 @@ export class AgentControlApp extends applicationV2Base {
         ${this.renderSelect("mode", "Mode", capabilities?.modes ?? [], selection.mode, !connected || !capabilities)}
       </section>
       ${this.renderSlotStatus(slotState)}
-      <div class="ac-live-note">Session reconnected — live events only. History is not replayed in this panel.</div>
+      <div class="ac-live-note">Live control-plane view — recent events are restored after reconnect when the server buffer still contains them.</div>
       <div class="ac-transcript" aria-live="polite">
         ${this.renderTranscript(slot, slotState)}
       </div>
@@ -272,11 +274,17 @@ export class AgentControlApp extends applicationV2Base {
           <div class="ac-entry-meta"><span>${entry.steered ? "You (steer)" : "You"}${entry.local ? " · sending" : ""}</span>${timestamp}</div>
           <div class="ac-entry-text">${formatText(entry.text)}</div>
         </article>`;
-      case "agent":
-        return `<article class="ac-entry ac-agent">
-          <div class="ac-entry-meta"><span>Agent${entry.streaming ? " · typing" : ""}</span>${timestamp}</div>
-          <div class="ac-entry-text">${formatText(entry.text)}</div>
+      case "agent": {
+        const activity = entry.activity === true && !entry.streaming;
+        const label = entry.streaming ? "Agent · typing" : activity ? "Agent activity" : "Agent";
+        const body = activity
+          ? `<details class="ac-activity-details"><summary>Show activity details</summary><div class="ac-entry-text">${formatText(entry.text)}</div></details>`
+          : `<div class="ac-entry-text">${formatText(entry.text)}</div>`;
+        return `<article class="ac-entry ac-agent ${activity ? "ac-agent-activity" : ""}">
+          <div class="ac-entry-meta"><span>${label}</span>${timestamp}</div>
+          ${body}
         </article>`;
+      }
       case "tool":
         return `<article class="ac-entry ac-tool ac-tool-${entry.status}">
           <div class="ac-tool-line"><span class="ac-tool-icon">⚙</span><strong>${escapeHtml(entry.name)}</strong><span>${entry.status}</span>${timestamp}</div>
@@ -327,7 +335,7 @@ export class AgentControlApp extends applicationV2Base {
     const slot = this.store.snapshot.activeSlot;
     const agentSelect = root.querySelector<HTMLSelectElement>("select[data-control='agent']");
     agentSelect?.addEventListener("change", () => {
-      if (agentSelect.value) this.store.selectAgent(slot, agentSelect.value);
+      if (agentSelect.value) void this.handleAgentSelection(slot, agentSelect.value);
     });
     const modelSelect = root.querySelector<HTMLSelectElement>("select[data-control='model']");
     modelSelect?.addEventListener("change", () => {
@@ -351,6 +359,27 @@ export class AgentControlApp extends applicationV2Base {
     transcript?.addEventListener("scroll", () => {
       this.stickToBottom = transcript.scrollTop + transcript.clientHeight >= transcript.scrollHeight - 48;
     });
+  }
+
+  private async handleAgentSelection(slot: AgentSlot, agent: string): Promise<void> {
+    const slotState = this.store.snapshot.slots[slot];
+    if (this.hasSlot(slotState) && slotState.agent === agent) {
+      this.queueRender();
+      return;
+    }
+    if (this.hasSlot(slotState)) {
+      const confirmed = await this.confirm(
+        "Replace this agent slot?",
+        "Changing providers requires detaching the current session and creating a new one. The current session is slept, not deleted, but its context will no longer be attached to this slot.",
+      );
+      if (!confirmed) {
+        this.queueRender();
+        return;
+      }
+      this.store.recreateSlotWithAgent(slot, agent);
+      return;
+    }
+    this.store.selectAgent(slot, agent);
   }
 
   private async handleAction(target: HTMLElement): Promise<void> {
@@ -379,7 +408,7 @@ export class AgentControlApp extends applicationV2Base {
         }
         break;
       case "destroy":
-        if (await this.confirm("Destroy this agent slot?", "The AgentControl session associated with this slot will be destroyed.")) {
+        if (await this.confirm("Destroy this agent slot?", "The AgentControl session will be detached from this slot and slept, not deleted.")) {
           this.store.destroy(activeSlot);
         }
         break;

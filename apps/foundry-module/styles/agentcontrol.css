@@ -115,6 +115,15 @@
   box-shadow: 0 0 0 3px rgba(121, 183, 145, 0.14);
 }
 
+.ac-daemon-warning {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  color: #ffe1a6;
+  background: rgba(216, 166, 87, 0.13);
+  border-bottom: 1px solid rgba(216, 166, 87, 0.28);
+  font-size: 12px;
+}
+
 .ac-config {
   display: grid;
   grid-template-columns: minmax(150px, 1.2fr) minmax(130px, 1fr) minmax(130px, 1fr);
@@ -280,6 +289,27 @@
   color: var(--ac-text);
   background: var(--ac-bg-soft);
   border-bottom-left-radius: 3px;
+}
+
+.ac-agent-activity .ac-entry-text {
+  color: #aeb8c4;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px dashed var(--ac-border-soft);
+}
+
+.ac-activity-details {
+  max-width: 86%;
+}
+
+.ac-activity-details summary {
+  width: fit-content;
+  color: var(--ac-text-dim);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.ac-activity-details[open] summary {
+  margin-bottom: 4px;
 }
 
 .ac-agent .ac-entry-meta span::after {

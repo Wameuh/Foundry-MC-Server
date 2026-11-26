@@ -6,6 +6,7 @@ import type { AgentControlPanelStore } from "../../apps/foundry-module/src/agent
 type AppInternals = {
   store: AgentControlPanelStore;
   template(): string;
+  handleAgentSelection(slot: "A" | "B", agent: string): Promise<void>;
 };
 
 function createApp() {
@@ -23,6 +24,7 @@ function createApp() {
 describe("AgentControl panel markup feature", () => {
   afterEach(() => {
     delete (globalThis as Record<string, unknown>).game;
+    delete (globalThis as Record<string, unknown>).foundry;
   });
 
   it("renders disconnected and empty-slot states with disabled controls", () => {
@@ -33,10 +35,14 @@ describe("AgentControl panel markup feature", () => {
 
     const html = app.template();
 
-    expect(sent).toEqual([{ type: "agentcontrol.getCapabilities" }, { type: "agentcontrol.listSlots" }]);
+    expect(sent).toEqual([
+      { type: "agentcontrol.getCapabilities" },
+      { type: "agentcontrol.getState", slot: "A" },
+      { type: "agentcontrol.getState", slot: "B" },
+    ]);
     expect(html).toContain("Disconnected — waiting for bridge registration");
     expect(html).toContain("No AgentControl session exists for this slot yet");
-    expect(html).toContain("Session reconnected — live events only");
+    expect(html).toContain("recent events are restored after reconnect");
     expect(html).toMatch(/<textarea[^>]*disabled/);
     expect(html).toContain("Agent A");
     expect(html).toContain("Agent B");
@@ -76,6 +82,67 @@ describe("AgentControl panel markup feature", () => {
     expect(html).toContain("World inspection complete");
     expect(html).toContain("ac-tab-badge");
     expect(html).not.toContain("Permission requested");
+  });
+
+  it("requires confirmation and recreates a live slot when switching providers", async () => {
+    (globalThis as Record<string, unknown>).game = {
+      settings: { get: () => ({}), set: () => Promise.resolve() },
+    };
+    (globalThis as Record<string, unknown>).foundry = {
+      applications: { api: { DialogV2: { confirm: () => Promise.resolve(true) } } },
+    };
+    const { app, sent } = createApp();
+    app.store.setConnected(true);
+    app.store.handleServerMessage({
+      type: "agentcontrol.capabilities",
+      agents: [{ id: "devin", name: "Devin", available: true, models: [{ value: "model", label: "Model" }], modes: [{ value: "code", label: "Code" }] }],
+    });
+    app.store.handleServerMessage({
+      type: "agentcontrol.slots",
+      slots: [{ slot: "A", sessionId: "session-a", agent: "claude", alive: true, busy: false }],
+    });
+    sent.length = 0;
+
+    await app.handleAgentSelection("A", "devin");
+
+    expect(sent.map((message) => (message as { type?: string }).type)).toEqual(["agentcontrol.destroySlot", "agentcontrol.ensureSlot"]);
+  });
+
+  it("surfaces a degraded AgentControl daemon state inferred from capabilities", () => {
+    (globalThis as Record<string, unknown>).game = {
+      settings: { get: () => ({}), set: () => Promise.resolve() },
+    };
+    const { app } = createApp();
+    app.store.setConnected(true);
+    app.store.handleServerMessage({
+      type: "agentcontrol.capabilities",
+      agents: [{ id: "devin", name: "Devin", available: false, models: [], modes: [] }],
+    });
+
+    expect(app.template()).toContain("AgentControl daemon appears unavailable");
+  });
+
+  it("renders unmatched chunk streams as collapsed agent activity", () => {
+    (globalThis as Record<string, unknown>).game = {
+      settings: { get: () => ({}), set: () => Promise.resolve() },
+    };
+    const { app } = createApp();
+    app.store.setConnected(true);
+    app.store.handleServerMessage({
+      type: "agentcontrol.event",
+      slot: "A",
+      event: { kind: "agent_chunk", text: "Inspecting scene state", ts: 1_000 },
+    });
+    app.store.handleServerMessage({
+      type: "agentcontrol.event",
+      slot: "A",
+      event: { kind: "agent_message", text: "Inspection complete", ts: 1_100 },
+    });
+
+    const html = app.template();
+    expect(html).toContain("Agent activity");
+    expect(html).toContain("ac-activity-details");
+    expect(html).toContain("Inspection complete");
   });
 
   it("renders permission cards inline when their slot is active", () => {
