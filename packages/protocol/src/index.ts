@@ -1,6 +1,7 @@
 export * from "./bridge-messages.js";
 export * from "./capabilities.js";
 export * from "./constants.js";
+export * from "./control-plane.js";
 export * from "./errors.js";
 export * from "./operation-receipt.js";
 export * from "./schemas/common.js";
