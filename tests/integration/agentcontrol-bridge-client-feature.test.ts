@@ -54,7 +54,7 @@ function installFoundry(): void {
     system: { id: "dnd5e", version: "6.1.1" },
     settings: {
       get: (_module: string, key: string) => {
-        if (key === "bridgeUrl") return "ws://127.0.0.1:3210/foundry-mcp/control";
+        if (key === "bridgeUrl") return "ws://127.0.0.1:3210/foundry-mcp/bridge";
         if (key === "bridgeSecret") return "test-secret";
         return false;
       },

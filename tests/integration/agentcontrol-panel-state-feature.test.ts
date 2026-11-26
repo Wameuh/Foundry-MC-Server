@@ -27,16 +27,17 @@ function createStore(saved: AgentControlPreferences = {}) {
 }
 
 describe("AgentControl panel state feature", () => {
-  it("requests capabilities and slots when opened and whenever the bridge reconnects", () => {
+  it("requests capabilities and per-slot state when opened and whenever the bridge reconnects", () => {
     const { store, sent } = createStore();
     store.start();
     store.setConnected(true);
 
-    // The first pair is queued before registration and flushed by the bridge;
-    // no duplicate live pair is needed for that initial connection.
+    // The first batch is queued before registration and flushed by the bridge;
+    // no duplicate live batch is needed for that initial connection.
     expect(sent).toEqual([
       { type: "agentcontrol.getCapabilities" },
-      { type: "agentcontrol.listSlots" },
+      { type: "agentcontrol.getState", slot: "A" },
+      { type: "agentcontrol.getState", slot: "B" },
     ]);
     expect(store.snapshot.connected).toBe(true);
 
@@ -44,9 +45,11 @@ describe("AgentControl panel state feature", () => {
     store.setConnected(true);
     expect(sent).toEqual([
       { type: "agentcontrol.getCapabilities" },
-      { type: "agentcontrol.listSlots" },
+      { type: "agentcontrol.getState", slot: "A" },
+      { type: "agentcontrol.getState", slot: "B" },
       { type: "agentcontrol.getCapabilities" },
-      { type: "agentcontrol.listSlots" },
+      { type: "agentcontrol.getState", slot: "A" },
+      { type: "agentcontrol.getState", slot: "B" },
     ]);
   });
 
@@ -161,6 +164,94 @@ describe("AgentControl panel state feature", () => {
       { type: "agentcontrol.respond", slot: "A", requestId: "request-1", optionId: "allow" },
       { type: "agentcontrol.respond", slot: "A", requestId: "request-2", answer: "freeform answer" },
     ]);
+  });
+
+  it("deduplicates replayed getState events without dropping new events", () => {
+    const { store } = createStore();
+    const message = {
+      type: "agentcontrol.event" as const,
+      slot: "A" as const,
+      event: { kind: "agent_message" as const, text: "restored answer", ts: 1_100 },
+    };
+
+    store.handleServerMessage(message);
+    store.handleServerMessage(message);
+    store.handleServerMessage({
+      type: "agentcontrol.event",
+      slot: "A",
+      event: { kind: "agent_message", text: "restored answer", ts: 1_101 },
+    });
+
+    expect(store.snapshot.entries.A).toHaveLength(2);
+    expect(store.snapshot.entries.A.map((entry) => entry.ts)).toEqual([1_100, 1_101]);
+  });
+
+  it("keeps mismatched activity streams separate from the final agent answer", () => {
+    const { store } = createStore();
+    for (const text of ["Checking the world state", " and preparing a summary"]) {
+      store.handleServerMessage({
+        type: "agentcontrol.event",
+        slot: "A",
+        event: { kind: "agent_chunk", text, ts: 1_100 },
+      });
+    }
+    store.handleServerMessage({
+      type: "agentcontrol.event",
+      slot: "A",
+      event: { kind: "agent_message", text: "The world is ready.", ts: 1_200 },
+    });
+
+    expect(store.snapshot.entries.A).toHaveLength(2);
+    expect(store.snapshot.entries.A[0]).toMatchObject({
+      kind: "agent",
+      text: "Checking the world state and preparing a summary",
+      streaming: false,
+      activity: true,
+    });
+    expect(store.snapshot.entries.A[1]).toMatchObject({ kind: "agent", text: "The world is ready." });
+    expect(store.snapshot.entries.A[1]).not.toHaveProperty("activity");
+  });
+
+  it("folds generic daemon tool updates into the active tool line", () => {
+    const { store } = createStore();
+    store.handleServerMessage({
+      type: "agentcontrol.event",
+      slot: "A",
+      event: { kind: "tool_call", name: "Ran npm test", status: "started", detail: "npm test", ts: 1_100 },
+    });
+    store.handleServerMessage({
+      type: "agentcontrol.event",
+      slot: "A",
+      event: { kind: "tool_call", name: "tool", status: "started", detail: "tests running", ts: 1_101 },
+    });
+    store.handleServerMessage({
+      type: "agentcontrol.event",
+      slot: "A",
+      event: { kind: "tool_call", name: "tool", status: "finished", detail: "42 tests passed", ts: 1_102 },
+    });
+
+    expect(store.snapshot.entries.A).toHaveLength(1);
+    expect(store.snapshot.entries.A[0]).toMatchObject({
+      kind: "tool",
+      name: "Ran npm test",
+      status: "finished",
+      detail: "42 tests passed",
+      ts: 1_102,
+    });
+  });
+
+  it("destroys then re-ensures a live slot when the provider changes", () => {
+    const { store, sent } = createStore();
+    store.handleServerMessage({ type: "agentcontrol.capabilities", agents: capabilities });
+    store.handleServerMessage({
+      type: "agentcontrol.slots",
+      slots: [{ slot: "A", sessionId: "session-a", agent: "claude", alive: true, busy: false }],
+    });
+    sent.length = 0;
+
+    store.recreateSlotWithAgent("A", "devin");
+
+    expect(sent.map((message) => message.type)).toEqual(["agentcontrol.destroySlot", "agentcontrol.ensureSlot"]);
   });
 
   it("treats the slots message as a complete inventory so destroyed slots disappear", () => {

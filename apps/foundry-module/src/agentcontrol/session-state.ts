@@ -22,7 +22,7 @@ export type TranscriptEntry = {
   ts: number;
 } & (
   | { kind: "user"; text: string; local?: boolean; steered?: boolean }
-  | { kind: "agent"; text: string; streaming?: boolean }
+  | { kind: "agent"; text: string; streaming?: boolean; activity?: boolean }
   | { kind: "tool"; name: string; status: "started" | "finished" | "failed"; detail?: string }
   | { kind: "error"; text: string }
   | { kind: "system"; text: string }
@@ -45,6 +45,7 @@ export type TranscriptEntry = {
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type TranscriptEntryInput = DistributiveOmit<TranscriptEntry, "id">;
+type ToolTranscriptEntryInput = Omit<Extract<TranscriptEntry, { kind: "tool" }>, "id">;
 
 export type AgentControlPanelSnapshot = {
   connected: boolean;
@@ -103,16 +104,33 @@ export function normalizePreferences(value: unknown): AgentControlPreferences {
   return output;
 }
 
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+function eventFingerprint(event: AgentEvent): string {
+  return stableJson(event);
+}
+
 /**
- * UI-facing reducer for the live AgentControl control plane. It deliberately
- * keeps no daemon state beyond the events received on this websocket: history
- * replay is outside the v1 wire contract.
+ * UI-facing reducer for the AgentControl control plane. The wire contract has
+ * no event sequence ids, so replayed getState batches are deduplicated by
+ * stable event fingerprints before being reduced into transcript entries.
  */
 export class AgentControlPanelStore {
   private readonly sendControl: (message: unknown) => void;
   private readonly savePreferences?: ((preferences: AgentControlPreferences) => void) | undefined;
   private readonly now: () => number;
   private readonly listeners = new Set<StoreListener>();
+  private readonly eventFingerprints: Record<AgentSlot, Set<string>> = {
+    A: new Set(),
+    B: new Set(),
+  };
   private preferences: AgentControlPreferences;
   private nextEntryId = 1;
   private snapshotRequestPending = false;
@@ -163,7 +181,7 @@ export class AgentControlPanelStore {
 
   requestSnapshot(): void {
     this.sendControl({ type: "agentcontrol.getCapabilities" });
-    this.sendControl({ type: "agentcontrol.listSlots" });
+    for (const slot of AGENT_SLOTS) this.sendControl({ type: "agentcontrol.getState", slot });
   }
 
   setActiveSlot(slot: AgentSlot): void {
@@ -257,6 +275,13 @@ export class AgentControlPanelStore {
     this.ensureSlot(slot);
   }
 
+  recreateSlotWithAgent(slot: AgentSlot, agent: string): void {
+    this.destroy(slot);
+    this.selectAgent(slot, agent);
+    this.appendEntry(slot, { kind: "system", text: "Provider change requested — previous session detached; new session starting.", ts: this.now() });
+    this.emit();
+  }
+
   selectModel(slot: AgentSlot, model: string): void {
     this.setPreference(slot, { ...(this.preferences[slot] ?? {}), model });
     if (this.hasSession(slot)) this.sendControl({ type: "agentcontrol.setModel", slot, model });
@@ -334,6 +359,16 @@ export class AgentControlPanelStore {
   }
 
   private applyEvent(slot: AgentSlot, event: AgentEvent): void {
+    const fingerprint = eventFingerprint(event);
+    const seen = this.eventFingerprints[slot];
+    if (seen.has(fingerprint)) return;
+    if (event.kind === "cleared") seen.clear();
+    seen.add(fingerprint);
+    if (seen.size > 1_000) {
+      const oldest = seen.values().next().value;
+      if (oldest !== undefined) seen.delete(oldest);
+    }
+
     switch (event.kind) {
       case "user_message":
         this.appendServerUserMessage(slot, event.text, event.ts);
@@ -345,14 +380,13 @@ export class AgentControlPanelStore {
         this.appendAgentChunk(slot, event.text, event.ts);
         break;
       case "tool_call": {
-        const entry: Omit<Extract<TranscriptEntry, { kind: "tool" }>, "id"> = {
+        this.appendToolCall(slot, {
           kind: "tool",
           name: event.name,
           status: event.status,
           ts: event.ts,
           ...(event.detail !== undefined ? { detail: event.detail } : {}),
-        };
-        this.appendEntry(slot, entry);
+        });
         break;
       }
       case "permission_request":
@@ -399,6 +433,23 @@ export class AgentControlPanelStore {
     }
   }
 
+  private appendToolCall(slot: AgentSlot, entry: ToolTranscriptEntryInput): void {
+    const entries = this.snapshotValue.entries[slot];
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const existing = entries[index];
+      if (existing?.kind !== "tool") continue;
+      const genericUpdate = entry.name === "tool";
+      if (existing.name !== entry.name && !genericUpdate) continue;
+      if (existing.status !== "started" && entry.status === "started") continue;
+      existing.status = entry.status;
+      existing.ts = entry.ts;
+      if (entry.detail !== undefined) existing.detail = entry.detail;
+      this.noteActivity(slot);
+      return;
+    }
+    this.appendEntry(slot, entry);
+  }
+
   private appendServerUserMessage(slot: AgentSlot, text: string, ts: number): void {
     const entries = this.snapshotValue.entries[slot];
     const last = entries[entries.length - 1];
@@ -418,10 +469,11 @@ export class AgentControlPanelStore {
     const entries = this.snapshotValue.entries[slot];
     const last = entries[entries.length - 1];
     if (last?.kind === "agent" && last.streaming) {
-      last.text += text;
+      if (text.startsWith(last.text)) last.text = text;
+      else if (!last.text.endsWith(text)) last.text += text;
       last.ts = ts;
     } else {
-      this.appendEntry(slot, { kind: "agent", text, streaming: true, ts });
+      this.appendEntry(slot, { kind: "agent", text, streaming: true, activity: true, ts });
     }
     this.closeOtherStreams(slot);
   }
@@ -430,9 +482,16 @@ export class AgentControlPanelStore {
     const entries = this.snapshotValue.entries[slot];
     const last = entries[entries.length - 1];
     if (last?.kind === "agent" && last.streaming) {
-      if (text.startsWith(last.text)) last.text = text;
-      else if (last.text !== text && !last.text.endsWith(text)) last.text += text;
+      const streamIsFinalPrefix = text.startsWith(last.text);
+      const streamAlreadyContainsFinal = last.text === text || last.text.endsWith(text);
+      if (!streamIsFinalPrefix && !streamAlreadyContainsFinal) {
+        last.streaming = false;
+        this.appendEntry(slot, { kind: "agent", text, ts });
+        return;
+      }
+      if (streamIsFinalPrefix) last.text = text;
       last.streaming = false;
+      delete last.activity;
       last.ts = ts;
     } else {
       this.appendEntry(slot, { kind: "agent", text, ts });
