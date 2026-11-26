@@ -44,13 +44,6 @@ const SETTINGS: Setting[] = [
     onChange: notifyBridgeSettingsChanged,
   },
   {
-    key: "notifications",
-    name: "FOUNDRY_MCP.Settings.Notifications.Name",
-    hint: "FOUNDRY_MCP.Settings.Notifications.Hint",
-    type: Boolean,
-    default: true,
-  },
-  {
     key: "diagnostics",
     name: "FOUNDRY_MCP.Settings.Diagnostics.Name",
     hint: "FOUNDRY_MCP.Settings.Diagnostics.Hint",

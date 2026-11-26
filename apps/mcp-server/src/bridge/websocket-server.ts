@@ -4,7 +4,6 @@ import {
   BridgeAuthProofSchema,
   BridgeHeartbeatSchema,
   BridgeRegistrationSchema,
-  BridgeResponseSchema,
   ControlProvisionMessageSchema,
   isAgentControlMessage
 } from "@foundry-mcp/protocol";
@@ -17,7 +16,6 @@ import { websocketOriginAllowed } from "../security/origin-policy.js";
 import { createBridgeNonce, verifyBridgeAuthentication } from "./authentication.js";
 import type { CapabilityCache } from "./capability-cache.js";
 import type { BridgeSession } from "./bridge-session.js";
-import type { PendingRequests } from "./pending-requests.js";
 import type { SessionRegistry } from "./session-registry.js";
 import type { DirectFoundrySupervisor } from "../foundry-direct/supervisor.js";
 import type { AgentControlSlotManager } from "../agentcontrol/slot-manager.js";
@@ -48,7 +46,6 @@ export function attachBridgeWebSocketServer(options: {
   httpServer: HttpServer;
   config: AppConfig;
   sessions: SessionRegistry;
-  pending: PendingRequests;
   capabilities: CapabilityCache;
   direct?: DirectFoundrySupervisor;
   agentControl?: AgentControlSlotManager;
@@ -164,13 +161,6 @@ function handleConnection(
         });
         return;
       }
-      if (isObjectWithType(message, "response")) {
-        const response = BridgeResponseSchema.parse(message["response"]);
-        if (!options.pending.settle(response)) {
-          options.logger.debug({ requestId: response.requestId }, "Ignoring unknown or late bridge response");
-        }
-        return;
-      }
       throw new Error("Unknown bridge message");
     } catch (error) {
       options.logger.warn({ error }, "Rejected bridge message");
@@ -183,7 +173,6 @@ function handleConnection(
     state.unregisterAgentControl?.();
     if (state.session && options.sessions.clear(state.session)) {
       options.capabilities.clear();
-      options.pending.rejectAll();
     }
   });
 

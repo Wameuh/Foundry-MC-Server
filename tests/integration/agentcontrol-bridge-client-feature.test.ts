@@ -50,7 +50,7 @@ function installFoundry(): void {
   (globalThis as Record<string, unknown>).game = {
     user: { id: "gm-user", name: "GM", isGM: true },
     world: { id: "world-one", title: "World One" },
-    version: "14.367",
+    version: "14.370",
     system: { id: "dnd5e", version: "6.1.1" },
     settings: {
       get: (_module: string, key: string) => {

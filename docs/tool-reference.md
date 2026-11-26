@@ -1,15 +1,9 @@
-# Outils MCP
+# Référence des outils
 
-Règles : `foundry_get_agent_rules` retourne la version actuelle du manuel
-administrateur. Le même contenu est disponible comme ressource
-`foundry://agent-rules` et est inclus dans les instructions de connexion MCP.
+Les outils MCP exposés sont enregistrés dans `apps/mcp-server/src/mcp/tools` :
+documents Foundry, embedded documents, compendiums, suppression confirmée,
+statut/règles agent, et import local `content_*`.
 
-Lecture : `foundry_get_status`, `foundry_get_context`, `foundry_get_schema`, `foundry_search_documents`, `foundry_get_document`, `foundry_search_compendiums`.
-
-Écriture : `foundry_create_documents`, `foundry_update_documents`, `foundry_create_embedded`, `foundry_update_embedded`, `foundry_import_compendium`, `dnd5e_build_character`.
-
-Plutonium : `plutonium_get_capabilities`, `plutonium_import_reference`, `plutonium_import_entries`.
-
-Suppression : `foundry_prepare_delete`, puis `foundry_confirm_delete`.
-
-Un navigateur GM actif est requis pour tous les outils qui parlent à Foundry. Les imports Plutonium ne sont disponibles que si la capacité correspondante est annoncée par le pont.
+Les anciens outils `plutonium_import_*` exécutés dans le navigateur sont remplacés
+par `content_search`, `content_get`, `content_import_preview` et
+`content_import_commit`, qui fonctionnent à partir des données locales indexées.

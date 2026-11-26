@@ -52,7 +52,7 @@ export class DirectRequestRouter {
         tool: options.tool ?? operation,
         worldId: this.config.targetWorldId,
         userId: this.direct.status().userId ?? "unprovisioned",
-        provider: operation.startsWith("plutonium.") ? "plutonium" : "foundry",
+        provider: "foundry",
         status: "failed",
         durationMs: Date.now() - startedAt,
         errorCode: code
@@ -114,18 +114,6 @@ export class DirectRequestRouter {
         return operations.searchCompendiums(payload);
       case BridgeOperation.IMPORT_COMPENDIUM:
         return operations.importCompendium(payload, operationId);
-      case BridgeOperation.BUILD_CHARACTER:
-        throw new AppError("UNSUPPORTED_OPERATION", "dnd5e.buildCharacter is being rewritten for the direct backend");
-      case BridgeOperation.PLUTONIUM_GET_CAPABILITIES:
-        return {
-          active: false,
-          compatible: false,
-          backendReplacement: "local-content-catalog",
-          reason: "browser Plutonium runtime execution has been removed"
-        };
-      case BridgeOperation.PLUTONIUM_IMPORT_REFERENCE:
-      case BridgeOperation.PLUTONIUM_IMPORT_ENTRIES:
-        throw new AppError("PLUTONIUM_UNAVAILABLE", "Runtime Plutonium imports require a browser client and are replaced by the local content importer");
       case BridgeOperation.CONFIRM_DELETE:
         throw new AppError("UNSUPPORTED_OPERATION", "confirmDelete is orchestrated by the server, not routed directly");
       default:
