@@ -1,19 +1,13 @@
 # Compatibilité
 
-| Composant | Version certifiée |
-|---|---|
-| Node.js | 22.x |
-| Foundry VTT | 14.367 |
-| D&D5e | 5.3.3 |
-| Plutonium | 2.15.8* ; 2.18.1.v14 et 2.18.3.v14 |
-| Navigateur | Chromium récent |
+| Composant | Cible |
+| --- | --- |
+| Foundry VTT | 14.x, validé sur 14.370 |
+| dnd5e | 6.x, validé sur 6.1.1 |
+| Plutonium | optionnel pour le catalogue local, validé sur 2.20.4.v14 |
+| Node.js | 22+ |
+| AgentControl | daemon TCP local compatible NDJSON |
 
-Une session de navigateur GM active et connectée est une précondition de
-fonctionnement. Elle peut être manuelle ou supervisée en mode Chromium
-headless par le serveur MCP. Plutonium est optionnel ; ses versions
-`2.18.1.v14` et `2.18.3.v14` sont certifiées. La version `2.15.8` est
-explicitement supportée après vérification de son bundle Foundry 14 et du
-contrat d’import ; une validation live avec cette version reste recommandée.
-Les versions non testées échouent fermement pour les imports Plutonium.
-
-\* `2.15.8` est publiée avec un numéro non suffixé dans son manifeste Foundry 14.
+Aucune version de navigateur n'est requise pour les opérations documentaires.
+Un navigateur GM moderne reste nécessaire uniquement pour le provisioning initial
+et le panneau AgentControl.

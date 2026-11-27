@@ -8,41 +8,21 @@ const EnvironmentSchema = z.object({
   FOUNDRY_BRIDGE_SECRET: z.string().min(16),
   TARGET_WORLD_ID: z.string().min(1),
   FOUNDRY_ORIGIN: z.string().url(),
+  FOUNDRY_DIRECT_URL: z.string().url().optional(),
+  FOUNDRY_DIRECT_CREDENTIALS_PATH: z.string().min(1).default("./data/foundry-direct-credentials.json"),
+  AGENTCONTROL_TCP: z.string().min(1).default("127.0.0.1:7331"),
+  AGENTCONTROL_TOKEN_PATH: z.string().min(1).optional(),
+  AGENTCONTROL_WORKSPACE: z.string().min(1).default("/data/agent-workspace"),
+  AGENTCONTROL_SLOTS_PATH: z.string().min(1).default("./data/agentcontrol-slots.json"),
+  PLUTONIUM_DATA_PATH: z.string().min(1).optional(),
   AUDIT_LOG_PATH: z.string().min(1).default("./data/audit.jsonl"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   NORMAL_OPERATION_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
-  PLUTONIUM_OPERATION_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   BRIDGE_HEARTBEAT_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   DELETE_CONFIRMATION_TTL_MS: z.coerce.number().int().positive().default(120_000),
   MAX_JSON_BODY_BYTES: z.coerce.number().int().positive().default(2 * 1024 * 1024),
   MCP_ALLOWED_HOSTS: z.string().optional(),
-  FOUNDRY_HEADLESS_ENABLED: z.enum(["true", "false"]).default("false"),
-  FOUNDRY_HEADLESS_URL: z.string().url().default("http://127.0.0.1:30000"),
-  FOUNDRY_HEADLESS_USERNAME: z.string().min(1).optional(),
-  FOUNDRY_HEADLESS_ACCESS_KEY: z.string().min(1).optional(),
-  FOUNDRY_HEADLESS_BRIDGE_URL: z.string().url().optional(),
-  FOUNDRY_HEADLESS_CHROMIUM_PATH: z.string().min(1).default("/usr/bin/chromium"),
-  FOUNDRY_HEADLESS_PROFILE_PATH: z.string().min(1).default("./data/chromium-profile"),
-  // false: keep sandbox. true: always disable. auto: retry once with --no-sandbox after a sandbox launch failure.
-  FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX: z.enum(["true", "false", "auto"]).default("false"),
-  FOUNDRY_HEADLESS_READY_TIMEOUT_MS: z.coerce.number().int().min(30_000).default(300_000),
-  FOUNDRY_HEADLESS_RETRY_MS: z.coerce.number().int().min(1_000).default(10_000),
-  FOUNDRY_HEADLESS_BRIDGE_GRACE_MS: z.coerce.number().int().min(5_000).default(180_000)
 });
-
-export type HeadlessBrowserConfig = {
-  enabled: boolean;
-  foundryUrl: string;
-  username?: string;
-  accessKey?: string;
-  bridgeUrl: string;
-  chromiumPath: string;
-  profilePath: string;
-  chromiumNoSandbox: boolean | "auto";
-  readyTimeoutMs: number;
-  retryMs: number;
-  bridgeGraceMs: number;
-};
 
 export type AppConfig = {
   nodeEnv: "development" | "test" | "production";
@@ -52,15 +32,20 @@ export type AppConfig = {
   bridgeSecret: string;
   targetWorldId: string;
   foundryOrigin: string;
+  foundryDirectUrl: string;
+  foundryDirectCredentialsPath: string;
+  agentControlTcp: string;
+  agentControlTokenPath?: string;
+  agentControlWorkspace: string;
+  agentControlSlotsPath: string;
+  plutoniumDataPath?: string;
   auditLogPath: string;
   logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
   normalOperationTimeoutMs: number;
-  plutoniumOperationTimeoutMs: number;
   bridgeHeartbeatTimeoutMs: number;
   deleteConfirmationTtlMs: number;
   maxJsonBodyBytes: number;
   allowedHosts?: string[];
-  headlessBrowser: HeadlessBrowserConfig;
 };
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -74,17 +59,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     throw new Error("MCP_ALLOWED_HOSTS is required when MCP_HOST listens on all interfaces");
   }
 
-  const headlessEnabled = value.FOUNDRY_HEADLESS_ENABLED === "true";
-  if (headlessEnabled && (!value.FOUNDRY_HEADLESS_USERNAME || !value.FOUNDRY_HEADLESS_ACCESS_KEY)) {
-    throw new Error("FOUNDRY_HEADLESS_USERNAME and FOUNDRY_HEADLESS_ACCESS_KEY are required when headless mode is enabled");
-  }
-  if (headlessEnabled && new URL(value.FOUNDRY_HEADLESS_URL).origin !== new URL(value.FOUNDRY_ORIGIN).origin) {
-    throw new Error("FOUNDRY_HEADLESS_URL and FOUNDRY_ORIGIN must use the same origin in headless mode");
-  }
-
-  const headlessBridgeUrl = value.FOUNDRY_HEADLESS_BRIDGE_URL
-    ?? `ws://127.0.0.1:${value.MCP_PORT}/foundry-mcp/bridge`;
-
   return {
     nodeEnv: value.NODE_ENV,
     host: value.MCP_HOST,
@@ -93,28 +67,19 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     bridgeSecret: value.FOUNDRY_BRIDGE_SECRET,
     targetWorldId: value.TARGET_WORLD_ID,
     foundryOrigin: value.FOUNDRY_ORIGIN,
+    foundryDirectUrl: value.FOUNDRY_DIRECT_URL ?? value.FOUNDRY_ORIGIN,
+    foundryDirectCredentialsPath: value.FOUNDRY_DIRECT_CREDENTIALS_PATH,
+    agentControlTcp: value.AGENTCONTROL_TCP,
+    ...(value.AGENTCONTROL_TOKEN_PATH ? { agentControlTokenPath: value.AGENTCONTROL_TOKEN_PATH } : {}),
+    agentControlWorkspace: value.AGENTCONTROL_WORKSPACE,
+    agentControlSlotsPath: value.AGENTCONTROL_SLOTS_PATH,
+    ...(value.PLUTONIUM_DATA_PATH ? { plutoniumDataPath: value.PLUTONIUM_DATA_PATH } : {}),
     auditLogPath: value.AUDIT_LOG_PATH,
     logLevel: value.LOG_LEVEL,
     normalOperationTimeoutMs: value.NORMAL_OPERATION_TIMEOUT_MS,
-    plutoniumOperationTimeoutMs: value.PLUTONIUM_OPERATION_TIMEOUT_MS,
     bridgeHeartbeatTimeoutMs: value.BRIDGE_HEARTBEAT_TIMEOUT_MS,
     deleteConfirmationTtlMs: value.DELETE_CONFIRMATION_TTL_MS,
     maxJsonBodyBytes: value.MAX_JSON_BODY_BYTES,
-    ...(allowedHosts?.length ? { allowedHosts } : {}),
-    headlessBrowser: {
-      enabled: headlessEnabled,
-      foundryUrl: value.FOUNDRY_HEADLESS_URL,
-      ...(value.FOUNDRY_HEADLESS_USERNAME ? { username: value.FOUNDRY_HEADLESS_USERNAME } : {}),
-      ...(value.FOUNDRY_HEADLESS_ACCESS_KEY ? { accessKey: value.FOUNDRY_HEADLESS_ACCESS_KEY } : {}),
-      bridgeUrl: headlessBridgeUrl,
-      chromiumPath: value.FOUNDRY_HEADLESS_CHROMIUM_PATH,
-      profilePath: value.FOUNDRY_HEADLESS_PROFILE_PATH,
-      chromiumNoSandbox: value.FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX === "auto"
-        ? "auto"
-        : value.FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX === "true",
-      readyTimeoutMs: value.FOUNDRY_HEADLESS_READY_TIMEOUT_MS,
-      retryMs: value.FOUNDRY_HEADLESS_RETRY_MS,
-      bridgeGraceMs: value.FOUNDRY_HEADLESS_BRIDGE_GRACE_MS
-    }
+    ...(allowedHosts?.length ? { allowedHosts } : {})
   };
 }

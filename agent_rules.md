@@ -27,3 +27,12 @@
 ## Leçon tirée de la Matriarche harpie
 
 La création d'un acteur et de descriptions correctes ne suffit pas. Dans le cas de la Matriarche harpie, les attaques avaient été décrites et leurs dégâts renseignés, mais aucune activité fonctionnelle ne permettait de lancer les jets avec les bonus automatiques. Une fiche Foundry n'est complète que lorsque ses actions sont utilisables directement depuis l'interface.
+
+## Importer du contenu 5etools/Plutonium local
+
+- Pour un sort, un objet ou une créature présent dans les données locales, suivre strictement le flux `content_search` → `content_get` → `content_import_preview` → `content_import_commit`.
+- Toujours inspecter le document exact et la liste `warnings` renvoyés par `content_import_preview` avant toute écriture. Ne pas utiliser `content_import_commit` directement sauf si l'utilisateur a explicitement validé un import sans inspection préalable.
+- Les avertissements ne sont pas du bruit : chaque approximation, champ ignoré ou mécanique non convertie doit être communiqué à l'utilisateur. En particulier, signaler clairement que le lancer de sorts des créatures n'est pas encore importé par la version actuelle du convertisseur lorsque cet avertissement apparaît.
+- Utiliser `source` dès que plusieurs entrées portent le même nom. Pour les objets destinés à un acteur, utiliser `destination.actorUuid`; pour un document de monde, utiliser éventuellement `destination.folderId`.
+- `content_import_commit` refuse par défaut les doublons de nom. Ne passer `options.overwrite=true` que si l'utilisateur accepte explicitement de remplacer le document existant; dans ce cas vérifier le reçu et rapporter qu'une mise à jour, et non une création, a été effectuée.
+- L'aperçu de conversion est déterministe : si le JSON ou les avertissements ne conviennent pas, corriger la demande ou créer manuellement le contenu au lieu d'écrire puis de réparer à l'aveugle.

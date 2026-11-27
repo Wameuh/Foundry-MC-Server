@@ -1,16 +1,24 @@
 import type { McpServer } from "@modelcontextprotocol/server";
+import type { BridgeOperationValue } from "@foundry-mcp/protocol";
 
 import type { CapabilityCache } from "../../bridge/capability-cache.js";
-import type { RequestRouter } from "../../bridge/request-router.js";
 import type { SessionRegistry } from "../../bridge/session-registry.js";
 import type { ConfirmationStore } from "../../deletion/confirmation-store.js";
+import type { LocalContentCatalog } from "../../content/catalog.js";
+import type { ContentBackendOperations } from "../../content/importer.js";
 import { errorDetails } from "../../errors.js";
 
+export type OperationRouter = {
+  route(operation: BridgeOperationValue, payload: unknown, options?: { idempotencyKey?: string; tool?: string }): Promise<unknown>;
+};
+
 export type ToolDependencies = {
-  router: RequestRouter;
+  router: OperationRouter;
   sessions: SessionRegistry;
   capabilities: CapabilityCache;
   confirmations: ConfirmationStore;
+  contentCatalog?: LocalContentCatalog;
+  contentBackend?: ContentBackendOperations;
 };
 
 export type ToolRegistrar = (server: McpServer, dependencies: ToolDependencies) => void;

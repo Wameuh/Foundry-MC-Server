@@ -1,13 +1,6 @@
 import { z } from "zod";
 import { BridgeCapabilitySchema } from "./capabilities.js";
-import { ProtocolErrorSchema } from "./errors.js";
-import {
-  IdempotencyKeySchema,
-  JsonValueSchema,
-  NonEmptyIdentifierSchema,
-  OperationIdSchema,
-  RequestIdSchema
-} from "./schemas/common.js";
+import { NonEmptyIdentifierSchema } from "./schemas/common.js";
 
 export const BridgeRegistrationSchema = z
   .object({
@@ -32,18 +25,6 @@ export const BridgeRegistrationSchema = z
         version: z.string().trim().min(1).max(128)
       })
       .strict(),
-    modules: z
-      .object({
-        plutonium: z
-          .object({
-            active: z.boolean(),
-            version: z.string().trim().min(1).max(128).optional(),
-            compatible: z.boolean()
-          })
-          .strict()
-          .optional()
-      })
-      .strict(),
     capabilities: z.array(BridgeCapabilitySchema).max(256)
   })
   .strict();
@@ -63,52 +44,12 @@ export const BridgeOperation = {
   DELETE_DOCUMENTS: "foundry.deleteDocuments",
   SEARCH_COMPENDIUMS: "foundry.searchCompendiums",
   IMPORT_COMPENDIUM: "foundry.importCompendium",
-  BUILD_CHARACTER: "dnd5e.buildCharacter",
-  PLUTONIUM_GET_CAPABILITIES: "plutonium.getCapabilities",
-  PLUTONIUM_IMPORT_REFERENCE: "plutonium.importReference",
-  PLUTONIUM_IMPORT_ENTRIES: "plutonium.importEntries",
   PREPARE_DELETE: "foundry.prepareDelete",
   CONFIRM_DELETE: "foundry.confirmDelete"
 } as const;
 
 export const BridgeOperationSchema = z.enum(BridgeOperation);
 export type BridgeOperationValue = z.infer<typeof BridgeOperationSchema>;
-
-export const BridgeRequestSchema = z
-  .object({
-    requestId: RequestIdSchema,
-    operationId: OperationIdSchema,
-    operation: BridgeOperationSchema,
-    payload: JsonValueSchema,
-    deadline: z.number().int().positive(),
-    idempotencyKey: IdempotencyKeySchema.optional()
-  })
-  .strict();
-
-export type BridgeRequest = z.infer<typeof BridgeRequestSchema>;
-
-export const BridgeSuccessResponseSchema = z
-  .object({
-    requestId: RequestIdSchema,
-    ok: z.literal(true),
-    result: JsonValueSchema
-  })
-  .strict();
-
-export const BridgeErrorResponseSchema = z
-  .object({
-    requestId: RequestIdSchema,
-    ok: z.literal(false),
-    error: ProtocolErrorSchema
-  })
-  .strict();
-
-export const BridgeResponseSchema = z.discriminatedUnion("ok", [
-  BridgeSuccessResponseSchema,
-  BridgeErrorResponseSchema
-]);
-
-export type BridgeResponse = z.infer<typeof BridgeResponseSchema>;
 
 export const BridgeAuthChallengeSchema = z
   .object({
@@ -138,3 +79,20 @@ export const BridgeHeartbeatSchema = z
 export type BridgeAuthChallenge = z.infer<typeof BridgeAuthChallengeSchema>;
 export type BridgeAuthProof = z.infer<typeof BridgeAuthProofSchema>;
 export type BridgeHeartbeat = z.infer<typeof BridgeHeartbeatSchema>;
+
+export const ServiceAccountProvisionSchema = z
+  .object({
+    userId: NonEmptyIdentifierSchema,
+    username: z.string().trim().min(1).max(512),
+    password: z.string().min(8).max(512)
+  })
+  .strict();
+
+export const ControlProvisionMessageSchema = z
+  .object({
+    type: z.literal("control.provision"),
+    serviceAccount: ServiceAccountProvisionSchema
+  })
+  .strict();
+
+export type ServiceAccountProvision = z.infer<typeof ServiceAccountProvisionSchema>;

@@ -6,15 +6,13 @@ import type { Logger } from "pino";
 
 import type { AppConfig } from "../config.js";
 import type { ToolDependencies } from "../mcp/tools/shared.js";
-import type { HeadlessStatusProvider } from "../headless/types.js";
 import { registerHealthRoute } from "./health-route.js";
 import { registerMcpRoute } from "./mcp-route.js";
 
 export function createHttpServer(
   config: AppConfig,
   dependencies: ToolDependencies,
-  logger: Logger,
-  headless?: HeadlessStatusProvider
+  logger: Logger
 ): { httpServer: HttpServer; closeMcpHandler: () => Promise<void> } {
   const app = createMcpExpressApp({
     host: config.host,
@@ -22,7 +20,7 @@ export function createHttpServer(
     ...(config.allowedHosts ? { allowedHosts: config.allowedHosts, allowedOrigins: config.allowedHosts } : {})
   });
   app.disable("x-powered-by");
-  registerHealthRoute(app, dependencies.sessions, headless);
+  registerHealthRoute(app, dependencies.sessions);
   const handler = registerMcpRoute(app, config, dependencies);
 
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {

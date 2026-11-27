@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   BridgeAuthProofSchema,
   BridgeRegistrationSchema,
-  BridgeRequestSchema,
-  BridgeResponseSchema,
-  OperationReceiptSchema
+  OperationReceiptSchema,
+  AgentControlServerMessageSchema
 } from "../../../packages/protocol/src/index.js";
 
 describe("bridge protocol schemas", () => {
@@ -13,12 +12,9 @@ describe("bridge protocol schemas", () => {
       bridgeVersion: "1.0.0",
       world: { id: "test-world", title: "Test World" },
       user: { id: "gm-id", name: "Game Master", isGM: true },
-      foundry: { version: "14.367" },
-      system: { id: "dnd5e", version: "5.3.3" },
-      modules: {
-        plutonium: { active: true, version: "2.18.1.v14", compatible: true }
-      },
-      capabilities: ["foundry.status", "future.capability"]
+      foundry: { version: "14.370" },
+      system: { id: "dnd5e", version: "6.1.1" },
+      capabilities: ["foundry.control.provision", "future.capability"]
     });
 
     expect(parsed.capabilities).toContain("future.capability");
@@ -30,52 +26,11 @@ describe("bridge protocol schemas", () => {
         bridgeVersion: "1.0.0",
         world: { id: "test-world", title: "Test World" },
         user: { id: "user-id", name: "Player", isGM: false },
-        foundry: { version: "14.367" },
-        system: { id: "dnd5e", version: "5.3.3" },
-        modules: {},
+        foundry: { version: "14.370" },
+        system: { id: "dnd5e", version: "6.1.1" },
         capabilities: []
       })
     ).toThrow();
-  });
-
-  it("requires an epoch-millisecond deadline and a known operation", () => {
-    expect(
-      BridgeRequestSchema.safeParse({
-        requestId: "request-123",
-        operationId: "operation-123",
-        operation: "foundry.getContext",
-        payload: {},
-        deadline: Date.now() + 30_000
-      }).success
-    ).toBe(true);
-
-    expect(
-      BridgeRequestSchema.safeParse({
-        requestId: "request-123",
-        operationId: "operation-123",
-        operation: "foundry.executeJavascript",
-        payload: {},
-        deadline: "tomorrow"
-      }).success
-    ).toBe(false);
-  });
-
-  it("discriminates successful and failed responses", () => {
-    expect(
-      BridgeResponseSchema.safeParse({
-        requestId: "request-123",
-        ok: false,
-        error: { code: "DOCUMENT_NOT_FOUND", message: "Missing actor" }
-      }).success
-    ).toBe(true);
-
-    expect(
-      BridgeResponseSchema.safeParse({
-        requestId: "request-123",
-        ok: true,
-        error: { code: "INTERNAL_ERROR", message: "Invalid shape" }
-      }).success
-    ).toBe(false);
   });
 
   it("accepts only SHA-256 hex authentication proofs", () => {
@@ -90,13 +45,27 @@ describe("bridge protocol schemas", () => {
     expect(BridgeAuthProofSchema.safeParse({ ...base, hmac: "not-a-hmac" }).success).toBe(false);
   });
 
+  it("validates explicit AgentControl daemon health messages", () => {
+    expect(AgentControlServerMessageSchema.safeParse({
+      type: "agentcontrol.daemonHealth",
+      state: "error",
+      message: "socket failed",
+      ts: 1_700_000_000_000
+    }).success).toBe(true);
+    expect(AgentControlServerMessageSchema.safeParse({
+      type: "agentcontrol.daemonHealth",
+      state: "connecting",
+      ts: 1_700_000_000_000
+    }).success).toBe(false);
+  });
+
   it("validates normalized operation receipts", () => {
     expect(
       OperationReceiptSchema.safeParse({
         operationId: "operation-123",
         status: "completed",
         provider: "plutonium",
-        providerVersion: "2.18.1.v14",
+        providerVersion: "2.20.4.v14",
         created: [{ uuid: "Item.12345678", documentType: "Item", name: "Fireball" }],
         updated: [],
         skipped: [],

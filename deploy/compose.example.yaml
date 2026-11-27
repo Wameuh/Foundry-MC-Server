@@ -7,14 +7,19 @@ services:
     environment:
       MCP_HOST: 0.0.0.0
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1}
-      # Chromium's sandbox is often unusable in containers; opt in explicitly here.
-      FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX: ${FOUNDRY_HEADLESS_CHROMIUM_NO_SANDBOX:-true}
+      # When AgentControl runs on the Docker host:
+      AGENTCONTROL_TCP: ${AGENTCONTROL_TCP:-host.docker.internal:7331}
+      AGENTCONTROL_TOKEN_PATH: ${AGENTCONTROL_TOKEN_PATH:-/run/secrets/agentcontrol-daemon.token}
+      PLUTONIUM_DATA_PATH: ${PLUTONIUM_DATA_PATH:-/plutonium-data}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    shm_size: "1gb"
     ports:
       - "127.0.0.1:3210:3210"
     volumes:
       - ../data:/app/data
       - ../agent_rules.md:/app/agent_rules.md:ro
+      # Adjust the host path to the real daemon token location.
+      - ${AGENTCONTROL_TOKEN_FILE:-/config/.agentcontrol/daemon.token}:/run/secrets/agentcontrol-daemon.token:ro
+      # Mount the local Plutonium data directory read-only when using content_import_*.
+      - ${PLUTONIUM_DATA_HOST_PATH:-/data/Data/modules/plutonium/data}:/plutonium-data:ro

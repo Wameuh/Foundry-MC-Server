@@ -4,9 +4,10 @@ type Setting = {
   key: string;
   name: string;
   hint: string;
-  type: StringConstructor | BooleanConstructor;
-  default: string | boolean;
+  type: StringConstructor | BooleanConstructor | ObjectConstructor;
+  default: string | boolean | Record<string, unknown>;
   scope?: "world" | "client";
+  config?: boolean;
   onChange?: (value: unknown) => void;
 };
 
@@ -43,13 +44,6 @@ const SETTINGS: Setting[] = [
     onChange: notifyBridgeSettingsChanged,
   },
   {
-    key: "notifications",
-    name: "FOUNDRY_MCP.Settings.Notifications.Name",
-    hint: "FOUNDRY_MCP.Settings.Notifications.Hint",
-    type: Boolean,
-    default: true,
-  },
-  {
     key: "diagnostics",
     name: "FOUNDRY_MCP.Settings.Diagnostics.Name",
     hint: "FOUNDRY_MCP.Settings.Diagnostics.Hint",
@@ -64,6 +58,15 @@ const SETTINGS: Setting[] = [
     default: true,
     scope: "world",
   },
+  {
+    key: "agentControlSelections",
+    name: "FOUNDRY_MCP.Settings.AgentControlSelections.Name",
+    hint: "FOUNDRY_MCP.Settings.AgentControlSelections.Hint",
+    type: Object,
+    default: {},
+    scope: "client",
+    config: false,
+  },
 ];
 
 export function registerSettings(): void {
@@ -72,7 +75,7 @@ export function registerSettings(): void {
       name: setting.name,
       hint: setting.hint,
       scope: setting.scope ?? "world",
-      config: true,
+      config: setting.config ?? true,
       restricted: true,
       type: setting.type,
       default: setting.default,

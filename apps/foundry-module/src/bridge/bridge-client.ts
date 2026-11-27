@@ -1,20 +1,33 @@
-import { APPLICATION_VERSION, type BridgeRegistration, type BridgeRequest } from "@foundry-mcp/protocol";
+import {
+  APPLICATION_VERSION,
+  AgentControlServerMessageSchema,
+  type AgentControlServerMessage,
+  type BridgeRegistration,
+} from "@foundry-mcp/protocol";
 import { createChallengeHmac } from "./authenticate";
-import { dispatchRequest } from "./dispatcher";
 import { Heartbeat } from "./heartbeat";
 import { ReconnectBackoff } from "./reconnect";
 import { readSettings, type BridgeSettings } from "../settings/read-settings";
-import { getPlutoniumCapabilities } from "../integrations/plutonium/capability-probe";
 
 type ServerMessage =
   | { type: "auth.challenge"; nonce: string; issuedAt: number }
   | { type: "auth.accepted" }
-  | { type: "request"; request: BridgeRequest }
-  | { type: "ping" | "pong"; timestamp: number };
+  | { type: "registered" }
+  | { type: "control.provisioned"; ok: boolean; error?: string }
+  | { type: "ping" | "pong"; timestamp: number }
+  | AgentControlServerMessage;
+
+type ServerMessageHandler = (message: AgentControlServerMessage) => void;
+type ConnectionStateHandler = (registered: boolean) => void;
 
 export class BridgeClient {
   private socket: WebSocket | undefined;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private registered = false;
+  private readonly controlQueue: unknown[] = [];
+  private readonly serverMessageHandlers = new Set<ServerMessageHandler>();
+  private readonly connectionStateHandlers = new Set<ConnectionStateHandler>();
+  private emittedConnectionState = false;
   private stopped = false;
   private readonly backoff = new ReconnectBackoff();
   private readonly heartbeat = new Heartbeat(
@@ -34,6 +47,8 @@ export class BridgeClient {
     this.heartbeat.stop();
     this.socket?.close(1000, "module shutdown");
     this.socket = undefined;
+    this.registered = false;
+    this.emitConnectionState(false);
   }
 
   /** Restart the bridge using the current module settings. */
@@ -41,6 +56,35 @@ export class BridgeClient {
     this.stop();
     this.backoff.reset();
     this.start();
+  }
+
+  sendServiceAccountProvision(serviceAccount: { userId: string; username: string; password: string }): void {
+    this.sendControl({ type: "control.provision", serviceAccount });
+  }
+
+  /**
+   * Send a control-plane message. Messages sent before bridge registration are
+   * queued and transmitted in order as soon as the server accepts registration.
+   */
+  sendControl(message: unknown): void {
+    if (this.registered && this.socket?.readyState === WebSocket.OPEN) this.send(message);
+    else this.controlQueue.push(message);
+  }
+
+  /** Subscribe to validated agentcontrol.* messages received from the server. */
+  onServerMessage(handler: ServerMessageHandler): () => void {
+    this.serverMessageHandlers.add(handler);
+    return () => this.serverMessageHandlers.delete(handler);
+  }
+
+  /** Subscribe to bridge registration changes. */
+  onConnectionStateChange(handler: ConnectionStateHandler): () => void {
+    this.connectionStateHandlers.add(handler);
+    return () => this.connectionStateHandlers.delete(handler);
+  }
+
+  isRegistered(): boolean {
+    return this.registered && this.socket?.readyState === WebSocket.OPEN;
   }
 
   private connect(): void {
@@ -51,15 +95,16 @@ export class BridgeClient {
       ui.notifications?.error("Foundry MCP: use WSS, or WS only from an HTTP page on a local network.");
       return;
     }
+    this.registered = false;
     const socket = new WebSocket(settings.bridgeUrl);
     this.socket = socket;
     socket.addEventListener("open", () => this.debug(settings, "WebSocket connected; awaiting challenge."));
-    socket.addEventListener("message", (event) => void this.onMessage(event, settings));
+    socket.addEventListener("message", (event) => this.onMessage(event, settings));
     socket.addEventListener("close", (event) => this.onClose(settings, socket, event));
     socket.addEventListener("error", () => this.debug(settings, "WebSocket error."));
   }
 
-  private async onMessage(event: MessageEvent, settings: BridgeSettings): Promise<void> {
+  private onMessage(event: MessageEvent, settings: BridgeSettings): void {
     this.heartbeat.touch();
     let message: ServerMessage;
     try {
@@ -69,6 +114,12 @@ export class BridgeClient {
       return;
     }
     if (!message || typeof message !== "object" || typeof message.type !== "string") return;
+    if (message.type.startsWith("agentcontrol.")) {
+      const parsed = AgentControlServerMessageSchema.safeParse(message);
+      if (parsed.success) this.dispatchServerMessage(parsed.data);
+      else this.debug(settings, `Ignoring invalid AgentControl message ${message.type}.`);
+      return;
+    }
     switch (message.type) {
       case "auth.challenge":
         this.authenticate(message.nonce, settings);
@@ -78,11 +129,15 @@ export class BridgeClient {
         this.heartbeat.start();
         this.send({ type: "register", registration: createRegistration() });
         break;
-      case "request": {
-        const response = await dispatchRequest(message.request);
-        this.send({ type: "response", response });
+      case "registered":
+        this.registered = true;
+        while (this.controlQueue.length) this.send(this.controlQueue.shift());
+        this.emitConnectionState(true);
         break;
-      }
+      case "control.provisioned":
+        if (message.ok) ui.notifications?.info("Foundry MCP: backend service account provisioned.");
+        else ui.notifications?.error(`Foundry MCP: backend provisioning failed: ${message.error ?? "unknown error"}`);
+        break;
       case "pong":
         break;
       case "ping":
@@ -108,11 +163,23 @@ export class BridgeClient {
     if (this.socket !== socket) return;
     this.heartbeat.stop();
     this.socket = undefined;
+    this.registered = false;
+    this.emitConnectionState(false);
     if (this.stopped) return;
     const delay = this.backoff.next();
     const reason = event.reason ? ` (${event.reason})` : "";
     this.debug(settings, `WebSocket disconnected with code ${event.code}${reason}; retrying in ${delay}ms.`);
     this.reconnectTimer = setTimeout(() => this.connect(), delay);
+  }
+
+  private dispatchServerMessage(message: AgentControlServerMessage): void {
+    for (const handler of this.serverMessageHandlers) handler(message);
+  }
+
+  private emitConnectionState(registered: boolean): void {
+    if (this.emittedConnectionState === registered) return;
+    this.emittedConnectionState = registered;
+    for (const handler of this.connectionStateHandlers) handler(registered);
   }
 
   private send(message: unknown): void {
@@ -125,37 +192,13 @@ export class BridgeClient {
 }
 
 function createRegistration(): BridgeRegistration {
-  const plutonium = getPlutoniumCapabilities();
   return {
     bridgeVersion: APPLICATION_VERSION,
     world: { id: game.world?.id ?? "", title: game.world?.title ?? "" },
     user: { id: game.user?.id ?? "", name: game.user?.name ?? "", isGM: true },
     foundry: { version: game.version },
     system: { id: game.system.id, version: game.system.version },
-    modules: {
-      plutonium: {
-        active: plutonium.active,
-        ...(plutonium.version ? { version: plutonium.version } : {}),
-        compatible: plutonium.compatible,
-      },
-    },
-    capabilities: [
-      "foundry.documents.read",
-      "foundry.status",
-      "foundry.context",
-      "foundry.schema",
-      "foundry.documents.create",
-      "foundry.documents.update",
-      "foundry.documents.delete",
-      "foundry.embedded.create",
-      "foundry.embedded.update",
-      "foundry.compendiums.search",
-      "foundry.compendiums.import",
-      "dnd5e.character.build",
-      "plutonium.capabilities",
-      ...(plutonium.importJson ? ["plutonium.import.json"] : []),
-      ...(plutonium.importReference ? ["plutonium.import.reference"] : []),
-    ],
+    capabilities: ["foundry.control.provision", "agentcontrol.control"],
   };
 }
 

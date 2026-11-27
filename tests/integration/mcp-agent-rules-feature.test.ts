@@ -1,28 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import pino from "pino";
-import { AuditLog } from "../../apps/mcp-server/src/audit/audit-log.js";
 import { CapabilityCache } from "../../apps/mcp-server/src/bridge/capability-cache.js";
-import { PendingRequests } from "../../apps/mcp-server/src/bridge/pending-requests.js";
-import { RequestRouter } from "../../apps/mcp-server/src/bridge/request-router.js";
-import { SessionRegistry } from "../../apps/mcp-server/src/bridge/session-registry.js";
+import type { SessionRegistry } from "../../apps/mcp-server/src/bridge/session-registry.js";
 import { ConfirmationStore } from "../../apps/mcp-server/src/deletion/confirmation-store.js";
-import type { AppConfig } from "../../apps/mcp-server/src/config.js";
 import { connectMcpClient } from "../helpers/mcp-harness.js";
 
 function dependencies() {
-  const config = {
-    normalOperationTimeoutMs: 100,
-    plutoniumOperationTimeoutMs: 100,
-    bridgeHeartbeatTimeoutMs: 60_000,
-    targetWorldId: "test-world",
-    auditLogPath: "/tmp/foundry-mcp-agent-rules-feature-test.jsonl",
-  } as AppConfig;
-  const logger = pino({ level: "silent" });
-  const sessions = new SessionRegistry(config.targetWorldId, config.bridgeHeartbeatTimeoutMs, logger);
-  const pending = new PendingRequests();
+  const sessions = { getActive: () => undefined, close: () => undefined } as unknown as SessionRegistry;
   return {
-    router: new RequestRouter(sessions, pending, new AuditLog(config.auditLogPath, logger), config, logger),
+    router: { route: () => Promise.reject(new Error("agent rules test does not route operations")) },
     sessions,
     capabilities: new CapabilityCache(),
     confirmations: new ConfirmationStore(60_000),

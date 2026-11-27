@@ -1,6 +1,6 @@
 /**
  * Minimal Foundry VTT 14 ApplicationV2 join form fixture.
- * Observed on Foundry 14.364 (`id="join-game-form"`); certified target is 14.367.
+ * Observed on Foundry 14.364 (`id="join-game-form"`); certified target is 14.370.
  */
 export const FOUNDRY_V14_JOIN_GAME_FORM_FIXTURE = `
 <form class="application standard-form framed" data-application-part="form" id="join-game-form">
