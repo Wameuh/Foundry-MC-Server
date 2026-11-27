@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   BridgeAuthProofSchema,
   BridgeRegistrationSchema,
-  OperationReceiptSchema
+  OperationReceiptSchema,
+  AgentControlServerMessageSchema
 } from "../../../packages/protocol/src/index.js";
 
 describe("bridge protocol schemas", () => {
@@ -42,6 +43,20 @@ describe("bridge protocol schemas", () => {
 
     expect(BridgeAuthProofSchema.safeParse({ ...base, hmac: "a".repeat(64) }).success).toBe(true);
     expect(BridgeAuthProofSchema.safeParse({ ...base, hmac: "not-a-hmac" }).success).toBe(false);
+  });
+
+  it("validates explicit AgentControl daemon health messages", () => {
+    expect(AgentControlServerMessageSchema.safeParse({
+      type: "agentcontrol.daemonHealth",
+      state: "error",
+      message: "socket failed",
+      ts: 1_700_000_000_000
+    }).success).toBe(true);
+    expect(AgentControlServerMessageSchema.safeParse({
+      type: "agentcontrol.daemonHealth",
+      state: "connecting",
+      ts: 1_700_000_000_000
+    }).success).toBe(false);
   });
 
   it("validates normalized operation receipts", () => {

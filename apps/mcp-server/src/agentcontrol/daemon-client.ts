@@ -41,12 +41,9 @@ import type { Logger } from "pino";
  * usage_update, status_changed, session_cleared and error. Event timestamps
  * are ISO strings in `ts`.
  *
- * MCP injection investigation: the daemon binary contains no `mcpServers` or
- * `mcp_servers` protocol string, and unknown new_session fields are silently
- * ignored by serde, so an empirical create cannot prove support. Support is
- * therefore treated as experimental/inconclusive; slot-manager documents the
- * TODO and only sends a speculative mcpServers field behind an explicit
- * configuration flag.
+ * MCP injection investigation: the daemon ignores unknown new_session
+ * mcpServers/mcp_servers fields and exposes no protocol support for them.
+ * Foundry MCP access must therefore be configured at workspace/agent level.
  */
 
 export type DaemonPush = {
@@ -54,6 +51,11 @@ export type DaemonPush = {
   session?: string;
   event?: unknown;
   [key: string]: unknown;
+};
+
+export type DaemonConnectionState = {
+  state: "connected" | "disconnected" | "error";
+  message?: string;
 };
 
 type PendingRequest = {
@@ -102,6 +104,7 @@ export class AgentControlDaemonClient extends EventEmitter {
   private stopped = false;
   private reconnectTimer: NodeJS.Timeout | undefined;
   private backoffMs: number;
+  private closeError: string | undefined;
   private readonly pending = new Map<number, PendingRequest>();
   private readonly queued: number[] = [];
 
@@ -126,10 +129,18 @@ export class AgentControlDaemonClient extends EventEmitter {
     this.socket = undefined;
     socket?.destroy();
     this.rejectAll(new Error("AgentControl daemon client stopped"));
+    this.publishConnectionState("disconnected");
   }
 
   isConnected(): boolean {
     return this.authenticated && !!this.socket && !this.socket.destroyed;
+  }
+
+  private publishConnectionState(state: DaemonConnectionState["state"], message?: string): void {
+    this.emit("connection-state", {
+      state,
+      ...(message ? { message } : {})
+    } satisfies DaemonConnectionState);
   }
 
   async request<T = unknown>(req: string, fields: Record<string, unknown> = {}): Promise<T> {
@@ -164,7 +175,9 @@ export class AgentControlDaemonClient extends EventEmitter {
     try {
       token = (await readFile(tokenPath, "utf8")).trim();
     } catch (error) {
+      const message = `Unable to read AgentControl daemon token: ${asErrorMessage(error)}`;
       this.options.logger?.warn({ error: asErrorMessage(error) }, "Unable to read AgentControl daemon token");
+      this.publishConnectionState("error", message);
       this.scheduleReconnect();
       return;
     }
@@ -182,13 +195,17 @@ export class AgentControlDaemonClient extends EventEmitter {
     });
     socket.on("data", (chunk) => this.handleData(chunk));
     socket.on("error", (error) => {
+      this.closeError = error.message;
       this.options.logger?.warn({ error: error.message }, "AgentControl daemon socket error");
     });
     socket.on("close", () => {
       if (this.socket === socket) this.socket = undefined;
       const wasAuthenticated = this.authenticated;
       this.authenticated = false;
+      const closeError = this.closeError;
+      this.closeError = undefined;
       this.rejectAll(new Error("AgentControl daemon disconnected"));
+      this.publishConnectionState(closeError ? "error" : "disconnected", closeError);
       this.emit("disconnected");
       if (wasAuthenticated) this.options.logger?.warn("AgentControl daemon connection closed");
       this.scheduleReconnect();
@@ -237,9 +254,12 @@ export class AgentControlDaemonClient extends EventEmitter {
       if (value.ok === true) {
         this.authenticated = true;
         this.backoffMs = this.options.initialBackoffMs ?? 250;
+        this.closeError = undefined;
+        this.publishConnectionState("connected");
         this.emit("connected");
         this.flushQueue();
       } else {
+        this.closeError = "AgentControl daemon authentication failed";
         this.options.logger?.error("AgentControl daemon authentication failed");
         this.socket?.destroy();
       }

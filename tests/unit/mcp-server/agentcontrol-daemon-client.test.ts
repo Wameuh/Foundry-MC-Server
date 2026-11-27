@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AgentControlDaemonClient, type DaemonPush } from "../../../apps/mcp-server/src/agentcontrol/daemon-client.js";
+import { AgentControlDaemonClient, type DaemonConnectionState, type DaemonPush } from "../../../apps/mcp-server/src/agentcontrol/daemon-client.js";
 import { FakeAgentControlDaemon } from "../../helpers/fake-agentcontrol-daemon.js";
 
 describe("AgentControlDaemonClient", () => {
@@ -74,5 +74,27 @@ describe("AgentControlDaemonClient", () => {
     await daemon.close();
 
     await rejection;
+  });
+
+  it("publishes explicit connected and disconnected connection states", async () => {
+    const instance = createClient();
+    const states: DaemonConnectionState[] = [];
+    instance.on("connection-state", (state: DaemonConnectionState) => states.push(state));
+
+    await vi.waitFor(() => expect(states.some((state) => state.state === "connected")).toBe(true));
+    await daemon.close();
+
+    await vi.waitFor(() => expect(states.some((state) => state.state === "disconnected")).toBe(true));
+  });
+
+  it("publishes an error connection state when daemon authentication fails", async () => {
+    await writeFile(tokenPath, "wrong-token", { mode: 0o600 });
+    const instance = createClient();
+    const states: DaemonConnectionState[] = [];
+    instance.on("connection-state", (state: DaemonConnectionState) => states.push(state));
+
+    await vi.waitFor(() => expect(states.some((state) =>
+      state.state === "error" && state.message?.includes("authentication failed")
+    )).toBe(true));
   });
 });

@@ -25,12 +25,29 @@ export const AgentSlotStateSchema = z.object({
 }).strict();
 export type AgentSlotState = z.infer<typeof AgentSlotStateSchema>;
 
+export const AgentConfigValueSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  description: z.string().optional()
+}).strict();
+export type AgentConfigValue = z.infer<typeof AgentConfigValueSchema>;
+
+export const AgentConfigOptionSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  category: z.string().optional(),
+  currentValue: z.string().optional(),
+  options: z.array(AgentConfigValueSchema)
+}).strict();
+export type AgentConfigOption = z.infer<typeof AgentConfigOptionSchema>;
+
 export const AgentCapabilitiesSchema = z.object({
   id: z.string(),
   name: z.string(),
   available: z.boolean(),
   models: z.array(z.object({ value: z.string(), label: z.string() }).strict()),
-  modes: z.array(z.object({ value: z.string(), label: z.string() }).strict())
+  modes: z.array(z.object({ value: z.string(), label: z.string() }).strict()),
+  configOptions: z.array(AgentConfigOptionSchema).optional()
 }).strict();
 export type AgentCapabilities = z.infer<typeof AgentCapabilitiesSchema>;
 
@@ -58,6 +75,7 @@ export const AgentEventSchema = z.discriminatedUnion("kind", [
     requestId: z.string(),
     question: z.string(),
     options: z.array(z.object({ id: z.string(), label: z.string() }).strict()).optional(),
+    schema: z.unknown().optional(),
     ts: z.number()
   }).strict(),
   z.object({ kind: z.literal("permission_resolved"), requestId: z.string(), ts: z.number() }).strict(),
@@ -72,6 +90,8 @@ export type AgentEvent = z.infer<typeof AgentEventSchema>;
 
 export const AgentControlClientMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("agentcontrol.getCapabilities") }).strict(),
+  z.object({ type: z.literal("agentcontrol.listAgents") }).strict(),
+  z.object({ type: z.literal("agentcontrol.modelCatalog"), agent: z.string().min(1) }).strict(),
   z.object({ type: z.literal("agentcontrol.listSlots") }).strict(),
   z.object({
     type: z.literal("agentcontrol.ensureSlot"),
@@ -101,11 +121,20 @@ export const AgentControlClientMessageSchema = z.discriminatedUnion("type", [
     configId: z.string(),
     value: z.string()
   }).strict(),
+  z.object({
+    type: z.literal("agentcontrol.setConfigOption"),
+    slot: AgentSlotSchema,
+    configId: z.string(),
+    value: z.string()
+  }).strict(),
   z.object({ type: z.literal("agentcontrol.getState"), slot: AgentSlotSchema }).strict()
 ]);
 export type AgentControlClientMessage = z.infer<typeof AgentControlClientMessageSchema>;
 
 /* ---------------- Server → Module ---------------- */
+
+export const DaemonHealthStateSchema = z.enum(["connected", "disconnected", "error"]);
+export type DaemonHealthState = z.infer<typeof DaemonHealthStateSchema>;
 
 export const AgentControlServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
@@ -114,6 +143,20 @@ export const AgentControlServerMessageSchema = z.discriminatedUnion("type", [
     suggestedAgent: z.string().optional(),
     suggestedModel: z.string().optional(),
     suggestedMode: z.string().optional()
+  }).strict(),
+  z.object({
+    type: z.literal("agentcontrol.agents"),
+    agents: z.array(AgentCapabilitiesSchema)
+  }).strict(),
+  z.object({
+    type: z.literal("agentcontrol.modelCatalog"),
+    agent: z.string(),
+    models: z.array(z.object({ value: z.string(), label: z.string() }).strict())
+  }).strict(),
+  z.object({
+    type: z.literal("agentcontrol.configOptions"),
+    slot: AgentSlotSchema,
+    options: z.array(AgentConfigOptionSchema)
   }).strict(),
   z.object({
     type: z.literal("agentcontrol.slots"),
@@ -130,6 +173,12 @@ export const AgentControlServerMessageSchema = z.discriminatedUnion("type", [
     code: z.string(),
     message: z.string(),
     op: z.string().optional()
+  }).strict(),
+  z.object({
+    type: z.literal("agentcontrol.daemonHealth"),
+    state: DaemonHealthStateSchema,
+    message: z.string().optional(),
+    ts: z.number()
   }).strict()
 ]);
 export type AgentControlServerMessage = z.infer<typeof AgentControlServerMessageSchema>;

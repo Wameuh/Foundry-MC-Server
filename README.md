@@ -71,7 +71,6 @@ Variables principales :
 | `AGENTCONTROL_TOKEN_PATH` | chemin du token daemon si différent de `/config/.agentcontrol/daemon.token` |
 | `AGENTCONTROL_WORKSPACE` | workspace dédié aux agents A/B, défaut `/data/agent-workspace` |
 | `AGENTCONTROL_SLOTS_PATH` | persistance du mapping monde/slots, défaut `./data/agentcontrol-slots.json` |
-| `AGENTCONTROL_INJECT_FOUNDRY_MCP` | injection expérimentale des outils MCP dans les agents ; défaut `false` |
 | `PLUTONIUM_DATA_PATH` | répertoire local des JSON Plutonium/5etools à indexer |
 | `AUDIT_LOG_PATH`, `LOG_LEVEL` | audit JSONL et verbosité |
 | `NORMAL_OPERATION_TIMEOUT_MS` | timeout des opérations directes Foundry |
@@ -157,9 +156,9 @@ cancel, clear, compact, permissions/questions, choix du modèle/mode et état de
 slots. Le serveur ne proxy ni terminal, ni filesystem, ni RPC brute, ni sessions
 hors mapping. `destroySlot` met la session en sommeil plutôt que de la supprimer.
 
-`AGENTCONTROL_INJECT_FOUNDRY_MCP=true` est expérimental : le support daemon de
-`mcpServers` à la création de session n'est pas confirmé. Le défaut `false` est
-recommandé.
+Le daemon AgentControl ignore les champs `mcpServers` à la création de session ;
+l’accès aux outils Foundry des agents doit donc être configuré au niveau workspace/agent,
+pas injecté par le RPC `new_session`.
 
 ## Développement
 

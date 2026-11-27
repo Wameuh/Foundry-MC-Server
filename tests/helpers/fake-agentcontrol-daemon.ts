@@ -86,6 +86,14 @@ export class FakeAgentControlDaemon {
       }
     }
     if (request.req === "hang") return;
+    if (request.req === "model_catalog") {
+      this.push(socket, {
+        id: request.id,
+        ok: true,
+        result: { models: [{ label: "SWE-2.1 Medium", value: "swe-2-1-medium" }] }
+      });
+      return;
+    }
     if (request.req === "new_session") {
       this.sessionCounter += 1;
       this.push(socket, { id: request.id, ok: true, result: { session: `s-fake-${this.sessionCounter}` } });
@@ -113,7 +121,16 @@ export class FakeAgentControlDaemon {
             state: "idle",
             title: "fake session",
             context_used: 0,
-            context_size: 262144
+            context_size: 262144,
+            config_options: [
+              {
+                id: "thought_level",
+                name: "Thinking",
+                category: "model_config",
+                currentValue: "medium",
+                options: [{ value: "medium", name: "Medium" }, { value: "high", name: "High" }]
+              }
+            ]
           },
           pending: [],
           queue: [],

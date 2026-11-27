@@ -25,11 +25,15 @@ class MockDaemon extends EventEmitter {
         available: true,
         caps: {
           config_options: [
-            { id: "model", category: "model", options: [{ value: "model-a", name: "Model A" }] },
-            { id: "mode", category: "mode", options: [{ value: "bypass", name: "Bypass" }] }
+            { id: "model", category: "model", currentValue: "model-a", options: [{ value: "model-a", name: "Model A" }] },
+            { id: "mode", category: "mode", currentValue: "bypass", options: [{ value: "bypass", name: "Bypass" }] },
+            { id: "thought_level", category: "model_config", currentValue: "high", options: [{ value: "high", name: "High", description: "Deeper reasoning" }] }
           ]
         }
       }] as T;
+    }
+    if (req === "model_catalog") {
+      return { models: [{ label: "Model A", value: "model-a" }] } as T;
     }
     if (req === "new_session") {
       this.sessionCounter += 1;
@@ -46,7 +50,10 @@ class MockDaemon extends EventEmitter {
           state: "idle",
           title: String(fields.title ?? "session"),
           context_used: 10,
-          context_size: 100
+          context_size: 100,
+          config_options: [
+            { id: "thought_level", category: "model_config", currentValue: "high", options: [{ value: "high", name: "High" }] }
+          ]
         },
         pending: [],
         queue: [],
@@ -83,9 +90,6 @@ describe("AgentControlSlotManager", () => {
       targetWorldId: worldId,
       workspaceRoot: workspace,
       statePath,
-      serverPort: 3210,
-      mcpBearerToken: "mcp-token-for-tests",
-      injectFoundryMcp: false,
       logger: pino({ level: "silent" })
     });
   }
@@ -166,14 +170,18 @@ describe("AgentControlSlotManager", () => {
     await instance.handleMessage(worldId, { type: "agentcontrol.steer", slot: "A", text: "steer" }, send);
     await instance.handleMessage(worldId, { type: "agentcontrol.compact", slot: "A" }, send);
     await instance.handleMessage(worldId, { type: "agentcontrol.respond", slot: "A", requestId: "req-1", optionId: "allow" }, send);
+    await instance.handleMessage(worldId, { type: "agentcontrol.respond", slot: "A", requestId: "req-2", answer: { choice: "first" } }, send);
     await instance.handleMessage(worldId, { type: "agentcontrol.setConfig", slot: "A", configId: "thought_level", value: "high" }, send);
+    await instance.handleMessage(worldId, { type: "agentcontrol.setConfigOption", slot: "A", configId: "speed", value: "ultrafast" }, send);
 
     expect(daemon.calls).toEqual(expect.arrayContaining([
       expect.objectContaining({ req: "send", fields: expect.objectContaining({ session: "s-mock-1", text: "hello" }) }),
       expect.objectContaining({ req: "send", fields: expect.objectContaining({ session: "s-mock-1", text: "steer", steer: true }) }),
       expect.objectContaining({ req: "send", fields: expect.objectContaining({ session: "s-mock-1", text: "/compact" }) }),
       expect.objectContaining({ req: "respond", fields: expect.objectContaining({ session: "s-mock-1", request_id: "req-1", option_id: "allow" }) }),
-      expect.objectContaining({ req: "set_config_option", fields: expect.objectContaining({ session: "s-mock-1", config_id: "thought_level", value: "high" }) })
+      expect.objectContaining({ req: "respond", fields: expect.objectContaining({ session: "s-mock-1", request_id: "req-2", answer: { choice: "first" } }) }),
+      expect.objectContaining({ req: "set_config_option", fields: expect.objectContaining({ session: "s-mock-1", config_id: "thought_level", value: "high" }) }),
+      expect.objectContaining({ req: "set_config_option", fields: expect.objectContaining({ session: "s-mock-1", config_id: "speed", value: "ultrafast" }) })
     ]));
     expect(sent.filter((message) => message.type === "agentcontrol.error")).toHaveLength(0);
   });
@@ -218,6 +226,58 @@ describe("AgentControlSlotManager", () => {
     });
   });
 
+  it("sends current daemon health to new clients and broadcasts connectivity changes", () => {
+    const instance = manager();
+    const sent: AgentControlServerMessage[] = [];
+    instance.registerClient(worldId, (message) => sent.push(message));
+
+    expect(sent[0]).toMatchObject({ type: "agentcontrol.daemonHealth", state: "disconnected" });
+    sent.length = 0;
+
+    daemon.emit("connection-state", { state: "connected" });
+    daemon.emit("connection-state", { state: "connected" });
+    daemon.emit("connection-state", { state: "error", message: "socket failed" });
+
+    const health = sent.filter((message) => message.type === "agentcontrol.daemonHealth");
+    expect(health).toHaveLength(2);
+    expect(health[0]).toMatchObject({ state: "connected" });
+    expect(health[1]).toMatchObject({ state: "error", message: "socket failed" });
+    expect(health.every((message) => typeof message.ts === "number")).toBe(true);
+  });
+
+  it("forwards initial and live config_options for the owning slot", async () => {
+    const instance = manager();
+    await instance.ensureSlot(worldId, "A", { agent: "devin" });
+    const sent: AgentControlServerMessage[] = [];
+    instance.registerClient(worldId, (message) => sent.push(message));
+
+    expect(sent.some((message) =>
+      message.type === "agentcontrol.configOptions" &&
+      message.slot === "A" &&
+      message.options.some((option) => option.id === "thought_level" && option.currentValue === "high")
+    )).toBe(true);
+    sent.length = 0;
+
+    daemon.emit("push", {
+      push: "event",
+      session: "s-mock-1",
+      event: {
+        seq: 10,
+        type: "config_options",
+        options: [{ id: "thought_level", category: "model_config", currentValue: "max", options: [{ value: "max", name: "Max" }] }],
+        ts: "2026-01-01T00:00:00.000Z"
+      }
+    });
+
+    expect(sent).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "agentcontrol.configOptions",
+        slot: "A",
+        options: [expect.objectContaining({ id: "thought_level", currentValue: "max" })]
+      })
+    ]));
+  });
+
   it("serializes ensureSlot before an immediately following prompt", async () => {
     const instance = manager();
     const sent: AgentControlServerMessage[] = [];
@@ -248,9 +308,32 @@ describe("AgentControlSlotManager", () => {
         id: "devin",
         available: true,
         models: [{ value: "model-a", label: "Model A" }],
-        modes: [{ value: "bypass", label: "Bypass" }]
+        modes: [{ value: "bypass", label: "Bypass" }],
+        configOptions: expect.arrayContaining([
+          expect.objectContaining({ id: "thought_level", currentValue: "high" })
+        ])
       })]
     });
+  });
+
+  it("proxies provider agents and model catalogs through scoped control messages", async () => {
+    const instance = manager();
+    const sent: AgentControlServerMessage[] = [];
+    const send = (message: AgentControlServerMessage) => sent.push(message);
+
+    await instance.handleMessage(worldId, { type: "agentcontrol.listAgents" }, send);
+    await instance.handleMessage(worldId, { type: "agentcontrol.modelCatalog", agent: "devin" }, send);
+
+    expect(sent[0]).toMatchObject({
+      type: "agentcontrol.agents",
+      agents: [expect.objectContaining({ id: "devin", configOptions: expect.any(Array) })]
+    });
+    expect(sent[1]).toMatchObject({
+      type: "agentcontrol.modelCatalog",
+      agent: "devin",
+      models: [{ value: "model-a", label: "Model A" }]
+    });
+    expect(daemon.calls.some((call) => call.req === "model_catalog" && call.fields.agent === "devin")).toBe(true);
   });
 
   it("uses reversible sleep on destroy, forgets the mapping, and never deletes the daemon session", async () => {
@@ -265,27 +348,14 @@ describe("AgentControlSlotManager", () => {
     expect(instance.listSlots(worldId)[0]).not.toHaveProperty("sessionId");
   });
 
-  it("can emit the experimental Foundry MCP injection only when explicitly enabled", async () => {
-    const instance = new AgentControlSlotManager({
-      daemon,
-      targetWorldId: worldId,
-      workspaceRoot: workspace,
-      statePath,
-      serverPort: 3210,
-      mcpBearerToken: "mcp-token-for-tests",
-      injectFoundryMcp: true,
-      logger: pino({ level: "silent" })
-    });
+  it("does not send unsupported new_session MCP injection fields", async () => {
+    const instance = manager();
 
     await instance.ensureSlot(worldId, "A", { agent: "devin" });
 
     const creation = daemon.calls.find((call) => call.req === "new_session");
-    expect(creation?.fields.mcpServers).toEqual([{
-      name: "foundry",
-      type: "http",
-      url: "http://127.0.0.1:3210/mcp",
-      headers: { Authorization: "Bearer mcp-token-for-tests" }
-    }]);
+    expect(creation?.fields).not.toHaveProperty("mcpServers");
+    expect(creation?.fields).not.toHaveProperty("mcp_servers");
   });
 });
 
@@ -311,8 +381,35 @@ describe("normalizeDaemonEvent", () => {
       type: "question_request",
       request_id: "req-2",
       message: "Which option?",
+      schema: { type: "object", properties: { choice: { type: "string", oneOf: [{ const: "first", title: "First choice" }] } } },
+      options: [
+        { option_id: "first", name: "First choice" },
+        { id: "second", label: "Second choice" }
+      ],
       ts
-    })).toMatchObject({ kind: "question", requestId: "req-2", question: "Which option?" });
+    })).toMatchObject({
+      kind: "question",
+      requestId: "req-2",
+      question: "Which option?",
+      schema: { type: "object", properties: { choice: { type: "string" } } },
+      options: [
+        { id: "first", label: "First choice" },
+        { id: "second", label: "Second choice" }
+      ]
+    });
+
+    expect(normalizeDaemonEvent({
+      type: "question_request",
+      request_id: "req-3",
+      message: "Freeform answer?",
+      ts
+    })).toMatchObject({ kind: "question", requestId: "req-3", question: "Freeform answer?" });
+    expect(normalizeDaemonEvent({
+      type: "question_request",
+      request_id: "req-3",
+      message: "Freeform answer?",
+      ts
+    })).not.toHaveProperty("options");
   });
 
   it("normalizes tool lifecycle and lifecycle status", () => {

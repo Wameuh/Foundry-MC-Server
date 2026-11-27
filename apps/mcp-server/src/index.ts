@@ -42,9 +42,6 @@ async function main(): Promise<void> {
     targetWorldId: config.targetWorldId,
     workspaceRoot: config.agentControlWorkspace,
     statePath: config.agentControlSlotsPath,
-    serverPort: config.port,
-    mcpBearerToken: config.mcpBearerToken,
-    injectFoundryMcp: config.agentControlInjectFoundryMcp,
     logger
   });
   await agentControl.start();

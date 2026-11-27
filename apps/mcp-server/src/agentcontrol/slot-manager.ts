@@ -5,6 +5,7 @@ import {
   AgentControlClientMessageSchema,
   AgentEventSchema,
   type AgentCapabilities,
+  type AgentConfigOption,
   type AgentControlClientMessage,
   type AgentControlServerMessage,
   type AgentEvent,
@@ -14,10 +15,11 @@ import {
 import type { EventEmitter } from "node:events";
 import type { Logger } from "pino";
 
-import type { DaemonPush } from "./daemon-client.js";
+import type { DaemonConnectionState, DaemonPush } from "./daemon-client.js";
 
 export type DaemonClientLike = Pick<EventEmitter, "on"> & {
   request<T = unknown>(req: string, fields?: Record<string, unknown>): Promise<T>;
+  isConnected?: () => boolean;
 };
 
 type StoredSlot = {
@@ -45,6 +47,7 @@ type RuntimeSlot = {
   busy: boolean;
   contextUsed?: number;
   contextSize?: number;
+  configOptions?: AgentConfigOption[];
   lastSeq: number;
 };
 
@@ -58,9 +61,6 @@ export type AgentControlSlotManagerOptions = {
   targetWorldId: string;
   workspaceRoot: string;
   statePath?: string;
-  serverPort: number;
-  mcpBearerToken: string;
-  injectFoundryMcp: boolean;
   logger: Logger;
 };
 
@@ -215,6 +215,32 @@ function normalizeNamedOptions(value: unknown): { value: string; label: string }
   });
 }
 
+function normalizeConfigOptions(value: unknown): AgentConfigOption[] {
+  const items = Array.isArray(value) ? value : isRecord(value) && Array.isArray(value.options) ? value.options : [];
+  return items.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const id = asString(item.id);
+    if (!id) return [];
+    const options = Array.isArray(item.options) ? item.options.flatMap((option) => {
+      if (!isRecord(option)) return [];
+      const optionValue = asString(option.value);
+      if (!optionValue) return [];
+      return [{
+        value: optionValue,
+        label: asString(option.name) ?? asString(option.label) ?? optionValue,
+        ...(asString(option["description"]) ? { description: asString(option["description"]) as string } : {})
+      }];
+    }) : [];
+    return [{
+      id,
+      ...(asString(item.name) ? { name: asString(item.name) as string } : {}),
+      ...(asString(item.category) ? { category: asString(item.category) as string } : {}),
+      ...(asString(item.currentValue) ? { currentValue: asString(item.currentValue) as string } : {}),
+      options
+    }];
+  });
+}
+
 function normalizeCapabilities(value: unknown): AgentCapabilities[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const agents: AgentCapabilities[] = [];
@@ -224,10 +250,10 @@ function normalizeCapabilities(value: unknown): AgentCapabilities[] | undefined 
     const name = asString(item.name) ?? id;
     if (!id || !name) continue;
     const caps = isRecord(item.caps) ? item.caps : undefined;
-    const configOptions = Array.isArray(caps?.["config_options"]) ? caps["config_options"] : [];
-    const modelConfig = configOptions.find((option): option is LooseRecord =>
+    const rawConfigOptions = Array.isArray(caps?.["config_options"]) ? caps["config_options"] : [];
+    const modelConfig = rawConfigOptions.find((option): option is LooseRecord =>
       isRecord(option) && (option.category === "model" || option.id === "model"));
-    const modeConfig = configOptions.find((option): option is LooseRecord =>
+    const modeConfig = rawConfigOptions.find((option): option is LooseRecord =>
       isRecord(option) && (option.category === "mode" || option.id === "mode"));
     const models = normalizeNamedOptions(caps?.models).length
       ? normalizeNamedOptions(caps?.models)
@@ -237,7 +263,15 @@ function normalizeCapabilities(value: unknown): AgentCapabilities[] | undefined 
     const modes = normalizeNamedOptions(caps?.modes).length
       ? normalizeNamedOptions(caps?.modes)
       : normalizeNamedOptions(isRecord(modeConfig) ? modeConfig.options : undefined);
-    agents.push({ id, name, available: item.available === true, models, modes });
+    const configOptions = normalizeConfigOptions(caps?.["config_options"]);
+    agents.push({
+      id,
+      name,
+      available: item.available === true,
+      models,
+      modes,
+      ...(configOptions.length ? { configOptions } : {})
+    });
   }
   return agents.length ? agents : undefined;
 }
@@ -252,8 +286,9 @@ function normalizeToolStatus(value: unknown): "started" | "finished" | "failed" 
 function normalizePermissionOptions(value: unknown): { id: string; label: string }[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((option) => {
+    if (typeof option === "string" && option.length > 0) return [{ id: option, label: option }];
     if (!isRecord(option)) return [];
-    const id = asString(option.option_id) ?? asString(option.id);
+    const id = asString(option.option_id) ?? asString(option.id) ?? asString(option.value);
     if (!id) return [];
     return [{ id, label: asString(option.label) ?? asString(option.name) ?? id }];
   });
@@ -313,10 +348,13 @@ export function normalizeDaemonEvent(value: unknown): AgentEvent | undefined {
       break;
     }
     case "question_request": {
+      const options = normalizePermissionOptions(value.options);
       candidate = {
         kind: "question",
         requestId: asString(value.request_id) ?? "",
         question: asString(value.message) ?? asString(value.question) ?? asString(value.detail) ?? "Agent question",
+        ...(options.length ? { options } : {}),
+        ...(value["schema"] !== undefined ? { schema: value["schema"] } : {}),
         ts
       };
       break;
@@ -373,10 +411,13 @@ export class AgentControlSlotManager {
   private writeQueue: Promise<void> = Promise.resolve();
   private operationQueue: Promise<void> = Promise.resolve();
   private capabilitiesCache: { expiresAt: number; agents: AgentCapabilities[] } | undefined;
+  private daemonHealth: DaemonConnectionState;
 
   constructor(private readonly options: AgentControlSlotManagerOptions) {
     this.statePath = options.statePath ?? DEFAULT_STATE_PATH;
+    this.daemonHealth = { state: options.daemon.isConnected?.() === true ? "connected" : "disconnected" };
     options.daemon.on("push", (push: DaemonPush) => this.handlePush(push));
+    options.daemon.on("connection-state", (state: unknown) => this.handleDaemonConnectionState(state));
     options.daemon.on("connected", () => {
       this.subscriptions.clear();
       void this.restoreSubscriptions().catch((error: unknown) => {
@@ -401,7 +442,14 @@ export class AgentControlSlotManager {
     this.assertWorld(worldId);
     const client: BridgeClient = { worldId, send };
     this.clients.add(client);
+    this.send(client, this.daemonHealthMessage());
     this.send(client, { type: "agentcontrol.slots", slots: this.listSlots(worldId) });
+    for (const slot of SLOTS) {
+      const state = this.runtimeSlot(worldId, slot);
+      if (state.configOptions) {
+        this.send(client, { type: "agentcontrol.configOptions", slot, options: state.configOptions });
+      }
+    }
     return () => this.clients.delete(client);
   }
 
@@ -439,6 +487,12 @@ export class AgentControlSlotManager {
       switch (message.type) {
         case "agentcontrol.getCapabilities":
           send(await this.capabilitiesMessage());
+          break;
+        case "agentcontrol.listAgents":
+          send(await this.agentsMessage());
+          break;
+        case "agentcontrol.modelCatalog":
+          send(await this.modelCatalogMessage(message.agent));
           break;
         case "agentcontrol.listSlots":
           send({ type: "agentcontrol.slots", slots: this.listSlots(worldId) });
@@ -484,6 +538,7 @@ export class AgentControlSlotManager {
           await this.updateStoredSlot(worldId, message.slot, { mode: message.mode });
           break;
         case "agentcontrol.setConfig":
+        case "agentcontrol.setConfigOption":
           await this.controlSlot(worldId, message.slot, "set_config_option", {
             config_id: message.configId,
             value: message.value
@@ -545,9 +600,8 @@ export class AgentControlSlotManager {
       ...(model ? { model } : {}),
       ...(mode ? { mode } : {})
     };
-    const mcpServers = this.foundryMcpServers();
-    if (mcpServers) request["mcpServers"] = mcpServers;
-
+    // The daemon silently ignores new_session.mcpServers. Foundry MCP access is
+    // therefore configured at the workspace/agent level rather than injected here.
     const created = await this.options.daemon.request("new_session", request);
     const sessionId = isRecord(created) ? asString(created.session) : undefined;
     if (!sessionId) throw new Error("AgentControl daemon did not return a session id");
@@ -564,6 +618,11 @@ export class AgentControlSlotManager {
     const state = this.runtimeSlot(worldId, slot);
     this.installStoredSession(state, stored);
     await this.subscribe(state, false);
+    try {
+      this.applySessionInfo(state, await this.options.daemon.request("session_info", { session: sessionId }));
+    } catch (error) {
+      this.options.logger.warn({ error: errorMessage(error), slot }, "Unable to read initial AgentControl session state");
+    }
     return this.publicState(state);
   }
 
@@ -611,6 +670,8 @@ export class AgentControlSlotManager {
     send: (message: AgentControlServerMessage) => void
   ): void {
     send({ type: "agentcontrol.slots", slots: this.listSlots(worldId) });
+    const state = this.runtimeSlot(worldId, slot);
+    if (state.configOptions) send({ type: "agentcontrol.configOptions", slot, options: state.configOptions });
     const buffered = this.eventBuffers.get(this.key(worldId, slot)) ?? [];
     for (const event of buffered) send({ type: "agentcontrol.event", slot, event });
   }
@@ -648,18 +709,17 @@ export class AgentControlSlotManager {
     return message.type === "agentcontrol.capabilities" ? message.suggestedAgent ?? "devin" : "devin";
   }
 
-  private foundryMcpServers(): unknown[] | undefined {
-    if (!this.options.injectFoundryMcp) return undefined;
-    // TODO(verification): current daemon inspection was inconclusive — unknown
-    // new_session fields are silently ignored and the binary exposes no
-    // mcpServers string. Keep this explicitly gated experimental pass-through
-    // so a future daemon supporting ACP session/new mcpServers can use it.
-    return [{
-      name: "foundry",
-      type: "http",
-      url: `http://127.0.0.1:${this.options.serverPort}/mcp`,
-      headers: { Authorization: `Bearer ${this.options.mcpBearerToken}` }
-    }];
+  private async agentsMessage(): Promise<AgentControlServerMessage> {
+    const result = await this.options.daemon.request("list_agents");
+    const agents = normalizeCapabilities(result);
+    if (!agents) throw new Error("AgentControl daemon returned no agent capabilities");
+    return { type: "agentcontrol.agents", agents };
+  }
+
+  private async modelCatalogMessage(agent: string): Promise<AgentControlServerMessage> {
+    const result = await this.options.daemon.request("model_catalog", { agent });
+    const models = isRecord(result) ? normalizeNamedOptions(result.models) : [];
+    return { type: "agentcontrol.modelCatalog", agent, models };
   }
 
   private handlePush(push: DaemonPush): void {
@@ -716,6 +776,12 @@ export class AgentControlSlotManager {
       }
       case "config_options": {
         if (!Array.isArray(value.options)) break;
+        state.configOptions = normalizeConfigOptions(value.options);
+        this.broadcast(state.worldId, {
+          type: "agentcontrol.configOptions",
+          slot: state.slot,
+          options: state.configOptions
+        });
         for (const option of value.options) {
           if (!isRecord(option)) continue;
           const current = asString(option.currentValue);
@@ -753,6 +819,14 @@ export class AgentControlSlotManager {
     if (title) state.title = title;
     if (contextUsed !== undefined) state.contextUsed = contextUsed;
     if (contextSize !== undefined) state.contextSize = contextSize;
+    if (meta["config_options"] !== undefined) {
+      state.configOptions = normalizeConfigOptions(meta["config_options"]);
+      this.broadcast(state.worldId, {
+        type: "agentcontrol.configOptions",
+        slot: state.slot,
+        options: state.configOptions
+      });
+    }
     state.busy = sessionState === "working" || sessionState === "compacting";
     if (["dead", "asleep", "interrupted"].includes(sessionState)) state.alive = false;
   }
@@ -913,6 +987,25 @@ export class AgentControlSlotManager {
       await rename(temporary, this.statePath);
     });
     await this.writeQueue;
+  }
+
+  private handleDaemonConnectionState(value: unknown): void {
+    if (!isRecord(value)) return;
+    const state = asString(value.state);
+    if (state !== "connected" && state !== "disconnected" && state !== "error") return;
+    const message = asString(value.message);
+    if (this.daemonHealth.state === state && this.daemonHealth.message === message) return;
+    this.daemonHealth = { state, ...(message ? { message } : {}) };
+    this.broadcast(this.options.targetWorldId, this.daemonHealthMessage());
+  }
+
+  private daemonHealthMessage(): AgentControlServerMessage {
+    return {
+      type: "agentcontrol.daemonHealth",
+      state: this.daemonHealth.state,
+      ...(this.daemonHealth.message ? { message: this.daemonHealth.message } : {}),
+      ts: Date.now()
+    };
   }
 
   private broadcastSlots(worldId: string): void {
