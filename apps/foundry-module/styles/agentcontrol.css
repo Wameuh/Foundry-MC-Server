@@ -126,7 +126,7 @@
 
 .ac-config {
   display: grid;
-  grid-template-columns: minmax(150px, 1.2fr) minmax(130px, 1fr) minmax(130px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
   gap: 10px;
   flex: 0 0 auto;
   padding: 11px 14px 9px;
@@ -162,7 +162,10 @@
 .ac-field select:disabled,
 .ac-input:disabled,
 .ac-button:disabled,
-.ac-question-answer:disabled {
+.ac-question-answer:disabled,
+.ac-question-field input:disabled,
+.ac-question-field select:disabled,
+.ac-question-field textarea:disabled {
   opacity: 0.48;
   cursor: not-allowed;
 }
@@ -406,7 +409,10 @@
   gap: 7px;
 }
 
-.ac-question-answer {
+.ac-question-answer,
+.ac-question-field input,
+.ac-question-field select,
+.ac-question-field textarea {
   flex: 1 1 220px;
   min-height: 29px;
   color: var(--ac-text);
@@ -414,6 +420,59 @@
   border: 1px solid var(--ac-border);
   border-radius: 5px;
   padding: 4px 7px;
+}
+
+.ac-question-form {
+  display: grid;
+  gap: 9px;
+  margin-top: 8px;
+}
+
+.ac-question-field {
+  display: grid;
+  gap: 4px;
+}
+
+.ac-question-field > span {
+  color: var(--ac-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ac-question-field small {
+  color: var(--ac-text-dim);
+  line-height: 1.35;
+}
+
+.ac-question-field textarea {
+  resize: vertical;
+}
+
+.ac-question-field select[multiple] {
+  min-height: 58px;
+}
+
+.ac-required {
+  margin-left: 3px;
+  color: var(--ac-warning);
+}
+
+.ac-question-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ac-field.is-pending > span {
+  color: var(--ac-warning);
+}
+
+.ac-field.is-pending select {
+  border-color: rgba(216, 166, 87, 0.55);
+}
+
+.ac-permission-always {
+  border-color: rgba(216, 166, 87, 0.7);
+  background: rgba(216, 166, 87, 0.14);
 }
 
 .ac-resolved {
@@ -447,7 +506,10 @@
 
 .ac-input:focus,
 .ac-field select:focus,
-.ac-question-answer:focus {
+.ac-question-answer:focus,
+.ac-question-field input:focus,
+.ac-question-field select:focus,
+.ac-question-field textarea:focus {
   outline: 1px solid var(--ac-accent);
   outline-offset: 0;
   border-color: var(--ac-accent);

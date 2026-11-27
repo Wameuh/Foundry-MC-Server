@@ -1,9 +1,11 @@
 import type {
   AgentCapabilities,
+  AgentConfigOption,
   AgentControlServerMessage,
   AgentEvent,
   AgentSlot,
   AgentSlotState,
+  DaemonHealthState,
 } from "@foundry-mcp/protocol";
 
 export const AGENT_SLOTS: readonly AgentSlot[] = ["A", "B"];
@@ -39,6 +41,7 @@ export type TranscriptEntry = {
       requestId: string;
       question: string;
       options?: Array<{ id: string; label: string }>;
+      schema?: unknown;
       resolved: boolean;
     }
 );
@@ -55,8 +58,15 @@ export type AgentControlPanelSnapshot = {
   suggestedModel?: string;
   suggestedMode?: string;
   slots: Record<AgentSlot, AgentSlotState>;
+  configOptions: Record<AgentSlot, AgentConfigOption[]>;
+  pendingConfig: Record<AgentSlot, Record<string, string>>;
   entries: Record<AgentSlot, TranscriptEntry[]>;
   unread: Record<AgentSlot, number>;
+  daemonHealth?: {
+    state: DaemonHealthState;
+    message?: string;
+    ts: number;
+  };
   errorBanner?: string;
 };
 
@@ -85,6 +95,14 @@ function emptyEntries(): Record<AgentSlot, TranscriptEntry[]> {
 
 function emptySlots(): Record<AgentSlot, AgentSlotState> {
   return { A: emptySlot("A"), B: emptySlot("B") };
+}
+
+function emptyConfigOptions(): Record<AgentSlot, AgentConfigOption[]> {
+  return { A: [], B: [] };
+}
+
+function emptyPendingConfig(): Record<AgentSlot, Record<string, string>> {
+  return { A: {}, B: {} };
 }
 
 export function normalizePreferences(value: unknown): AgentControlPreferences {
@@ -146,6 +164,8 @@ export class AgentControlPanelStore {
       activeSlot: "A",
       agents: [],
       slots: emptySlots(),
+      configOptions: emptyConfigOptions(),
+      pendingConfig: emptyPendingConfig(),
       entries: emptyEntries(),
       unread: { A: 0, B: 0 },
     };
@@ -201,12 +221,36 @@ export class AgentControlPanelStore {
         if (message.suggestedMode !== undefined) this.snapshotValue.suggestedMode = message.suggestedMode;
         else delete this.snapshotValue.suggestedMode;
         break;
+      case "agentcontrol.agents":
+        this.snapshotValue.agents = message.agents;
+        break;
+      case "agentcontrol.configOptions":
+        this.snapshotValue.configOptions[message.slot] = message.options;
+        this.clearSettledPendingConfig(message.slot);
+        break;
+      case "agentcontrol.daemonHealth":
+        this.snapshotValue.daemonHealth = {
+          state: message.state,
+          ...(message.message !== undefined ? { message: message.message } : {}),
+          ts: message.ts,
+        };
+        break;
+      case "agentcontrol.modelCatalog":
+        // Catalog responses are available to consumers that request them; the
+        // slot-scoped dynamic selectors are driven by configOptions instead.
+        break;
       case "agentcontrol.slots": {
         // listSlots is a complete inventory: slots omitted by the server no
         // longer exist and must not remain sticky in the UI.
         const slots = emptySlots();
         for (const slot of message.slots) slots[slot.slot] = slot;
         this.snapshotValue.slots = slots;
+        for (const slot of AGENT_SLOTS) {
+          if (!slots[slot].sessionId) {
+            this.snapshotValue.configOptions[slot] = [];
+            this.snapshotValue.pendingConfig[slot] = {};
+          }
+        }
         break;
       }
       case "agentcontrol.event":
@@ -214,6 +258,9 @@ export class AgentControlPanelStore {
         break;
       case "agentcontrol.error":
         if (message.slot) {
+          if (message.op === "agentcontrol.setConfig" || message.op === "agentcontrol.setConfigOption") {
+            this.clearRejectedPendingConfig(message.slot, message.message);
+          }
           this.appendEntry(message.slot, { kind: "error", text: message.message, ts: this.now() });
         } else {
           this.snapshotValue.errorBanner = message.message;
@@ -284,14 +331,44 @@ export class AgentControlPanelStore {
 
   selectModel(slot: AgentSlot, model: string): void {
     this.setPreference(slot, { ...(this.preferences[slot] ?? {}), model });
+    const modelConfig = this.findConfigOption(slot, "model");
+    if (modelConfig) {
+      this.selectConfigOption(slot, modelConfig.id, model);
+      return;
+    }
     if (this.hasSession(slot)) this.sendControl({ type: "agentcontrol.setModel", slot, model });
     else this.ensureSlot(slot);
   }
 
   selectMode(slot: AgentSlot, mode: string): void {
     this.setPreference(slot, { ...(this.preferences[slot] ?? {}), mode });
+    const modeConfig = this.findConfigOption(slot, "mode");
+    if (modeConfig) {
+      this.selectConfigOption(slot, modeConfig.id, mode);
+      return;
+    }
     if (this.hasSession(slot)) this.sendControl({ type: "agentcontrol.setMode", slot, mode });
     else this.ensureSlot(slot);
+  }
+
+  selectConfigOption(slot: AgentSlot, configId: string, value: string): void {
+    if (!configId || !value) return;
+    const option = this.snapshotValue.configOptions[slot].find((candidate) => candidate.id === configId);
+    const isModel = configId === "model" || option?.id === "model" || option?.category === "model";
+    const isMode = configId === "mode" || option?.id === "mode" || option?.category === "mode";
+    if (isModel) this.setPreference(slot, { ...(this.preferences[slot] ?? {}), model: value });
+    if (isMode) this.setPreference(slot, { ...(this.preferences[slot] ?? {}), mode: value });
+    if (!this.hasSession(slot)) {
+      if (isModel || isMode) this.ensureSlot(slot);
+      return;
+    }
+    this.snapshotValue.pendingConfig[slot][configId] = value;
+    this.sendControl({ type: "agentcontrol.setConfigOption", slot, configId, value });
+    this.emit();
+  }
+
+  findConfigOption(slot: AgentSlot, idOrCategory: string): AgentConfigOption | undefined {
+    return this.snapshotValue.configOptions[slot].find((option) => option.id === idOrCategory || option.category === idOrCategory);
   }
 
   sendPrompt(slot: AgentSlot, text: string): boolean {
@@ -358,6 +435,21 @@ export class AgentControlPanelStore {
     this.savePreferences?.(this.preferences);
   }
 
+  private clearSettledPendingConfig(slot: AgentSlot): void {
+    const pending = this.snapshotValue.pendingConfig[slot];
+    for (const [configId, value] of Object.entries(pending)) {
+      const option = this.snapshotValue.configOptions[slot].find((candidate) => candidate.id === configId);
+      if (!option || option.currentValue === value) delete pending[configId];
+    }
+  }
+
+  private clearRejectedPendingConfig(slot: AgentSlot, message: string): void {
+    const pending = this.snapshotValue.pendingConfig[slot];
+    const match = /set_config_option(?:=|\s+)([A-Za-z0-9_-]+)/.exec(message);
+    if (match?.[1] && pending[match[1]] !== undefined) delete pending[match[1]];
+    else for (const configId of Object.keys(pending)) delete pending[configId];
+  }
+
   private applyEvent(slot: AgentSlot, event: AgentEvent): void {
     const fingerprint = eventFingerprint(event);
     const seen = this.eventFingerprints[slot];
@@ -406,6 +498,7 @@ export class AgentControlPanelStore {
           requestId: event.requestId,
           question: event.question,
           ...(event.options !== undefined ? { options: event.options } : {}),
+          ...(event.schema !== undefined ? { schema: event.schema } : {}),
           resolved: false,
           ts: event.ts,
         });

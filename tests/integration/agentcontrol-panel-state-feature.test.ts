@@ -268,6 +268,128 @@ describe("AgentControl panel state feature", () => {
     expect(store.snapshot.slots.A).not.toHaveProperty("sessionId");
   });
 
+  it("stores forwarded config options, sends setConfigOption, and clears pending when applied", () => {
+    const { store, sent } = createStore();
+    store.handleServerMessage({
+      type: "agentcontrol.slots",
+      slots: [{ slot: "A", sessionId: "session-a", agent: "devin", alive: true, busy: false }],
+    });
+    store.handleServerMessage({
+      type: "agentcontrol.configOptions",
+      slot: "A",
+      options: [
+        { id: "thought_level", category: "thought_level", currentValue: "medium", options: [{ value: "medium", label: "Medium" }, { value: "high", label: "High" }] },
+        { id: "speed", category: "model_config", currentValue: "standard", options: [{ value: "standard", label: "Standard" }, { value: "ultrafast", label: "Ultrafast" }] },
+      ],
+    });
+    sent.length = 0;
+
+    store.selectConfigOption("A", "thought_level", "high");
+
+    expect(sent).toEqual([{ type: "agentcontrol.setConfigOption", slot: "A", configId: "thought_level", value: "high" }]);
+    expect(store.snapshot.pendingConfig.A).toEqual({ thought_level: "high" });
+
+    store.handleServerMessage({
+      type: "agentcontrol.configOptions",
+      slot: "A",
+      options: [
+        { id: "thought_level", category: "thought_level", currentValue: "high", options: [{ value: "medium", label: "Medium" }, { value: "high", label: "High" }] },
+        { id: "speed", category: "model_config", currentValue: "standard", options: [{ value: "standard", label: "Standard" }, { value: "ultrafast", label: "Ultrafast" }] },
+      ],
+    });
+    expect(store.snapshot.pendingConfig.A).toEqual({});
+  });
+
+  it("uses setConfigOption for dynamic model and mode controls instead of legacy controls", () => {
+    const { store, sent } = createStore();
+    store.handleServerMessage({
+      type: "agentcontrol.slots",
+      slots: [{ slot: "A", sessionId: "session-a", agent: "devin", alive: true, busy: false }],
+    });
+    store.handleServerMessage({
+      type: "agentcontrol.configOptions",
+      slot: "A",
+      options: [
+        { id: "model", category: "model", currentValue: "swe-a", options: [{ value: "swe-a", label: "SWE A" }, { value: "swe-b", label: "SWE B" }] },
+        { id: "mode", category: "mode", currentValue: "ask", options: [{ value: "ask", label: "Ask" }, { value: "plan", label: "Plan" }] },
+      ],
+    });
+    sent.length = 0;
+
+    store.selectModel("A", "swe-b");
+    store.selectMode("A", "plan");
+
+    expect(sent).toEqual([
+      { type: "agentcontrol.setConfigOption", slot: "A", configId: "model", value: "swe-b" },
+      { type: "agentcontrol.setConfigOption", slot: "A", configId: "mode", value: "plan" },
+    ]);
+  });
+
+  it("uses the daemon-provided config id even when model and mode are categories", () => {
+    const { store, sent, persisted } = createStore();
+    store.handleServerMessage({
+      type: "agentcontrol.slots",
+      slots: [{ slot: "A", sessionId: "session-a", agent: "devin", alive: true, busy: false }],
+    });
+    store.handleServerMessage({
+      type: "agentcontrol.configOptions",
+      slot: "A",
+      options: [
+        { id: "agent_model", category: "model", currentValue: "swe-a", options: [{ value: "swe-a", label: "SWE A" }, { value: "swe-b", label: "SWE B" }] },
+        { id: "permission_mode", category: "mode", currentValue: "ask", options: [{ value: "ask", label: "Ask" }, { value: "plan", label: "Plan" }] },
+      ],
+    });
+    sent.length = 0;
+
+    store.selectModel("A", "swe-b");
+    store.selectMode("A", "plan");
+
+    expect(sent).toEqual([
+      { type: "agentcontrol.setConfigOption", slot: "A", configId: "agent_model", value: "swe-b" },
+      { type: "agentcontrol.setConfigOption", slot: "A", configId: "permission_mode", value: "plan" },
+    ]);
+    expect(persisted()).toEqual({ A: { model: "swe-b", mode: "plan" } });
+  });
+
+  it("clears a pending config value and surfaces the daemon error when rejected", () => {
+    const { store } = createStore();
+    store.handleServerMessage({
+      type: "agentcontrol.slots",
+      slots: [{ slot: "A", sessionId: "session-a", agent: "devin", alive: true, busy: false }],
+    });
+    store.handleServerMessage({
+      type: "agentcontrol.configOptions",
+      slot: "A",
+      options: [{ id: "thought_level", category: "thought_level", currentValue: "medium", options: [{ value: "medium", label: "Medium" }, { value: "high", label: "High" }] }],
+    });
+
+    store.selectConfigOption("A", "thought_level", "high");
+    store.handleServerMessage({
+      type: "agentcontrol.error",
+      slot: "A",
+      code: "OPERATION_FAILED",
+      op: "agentcontrol.setConfigOption",
+      message: "set_config_option thought_level unknown « high » — values: medium, max",
+    });
+
+    expect(store.snapshot.pendingConfig.A).toEqual({});
+    expect(store.snapshot.entries.A.at(-1)).toMatchObject({ kind: "error", text: "set_config_option thought_level unknown « high » — values: medium, max" });
+  });
+
+  it("keeps question schemas in transcript entries and records explicit daemon health", () => {
+    const { store } = createStore();
+    const schema = { type: "object", properties: { choice: { type: "string", oneOf: [{ const: "a" }] } } };
+    store.handleServerMessage({
+      type: "agentcontrol.event",
+      slot: "A",
+      event: { kind: "question", requestId: "question-1", question: "Choose", schema, ts: 1_100 },
+    });
+    store.handleServerMessage({ type: "agentcontrol.daemonHealth", state: "error", message: "daemon unavailable", ts: 1_200 });
+
+    expect(store.snapshot.entries.A[0]).toMatchObject({ kind: "question", schema });
+    expect(store.snapshot.daemonHealth).toEqual({ state: "error", message: "daemon unavailable", ts: 1_200 });
+  });
+
   it("normalizes malformed persisted preferences defensively", () => {
     expect(normalizePreferences({
       A: { agent: "devin", model: 3, mode: "code" },
