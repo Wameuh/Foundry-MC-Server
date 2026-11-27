@@ -14,11 +14,18 @@ export const FoundrySearchDocumentsInputSchema = z
     documentType: NonEmptyIdentifierSchema,
     query: z.string().max(512).default(""),
     packId: NonEmptyIdentifierSchema.optional(),
+    parentUuid: UuidSchema.optional(),
     folderId: NonEmptyIdentifierSchema.optional(),
     limit: z.number().int().min(1).max(MAX_SEARCH_LIMIT).default(25),
     cursor: z.string().min(1).max(1024).optional()
   })
-  .strict();
+  .strict()
+  .refine((value) => !(value.parentUuid && value.packId), {
+    message: "parentUuid cannot be combined with packId"
+  })
+  .refine((value) => !(value.parentUuid && value.folderId), {
+    message: "parentUuid cannot be combined with folderId: embedded documents have no folder"
+  });
 export type FoundrySearchDocumentsInput = z.infer<
   typeof FoundrySearchDocumentsInputSchema
 >;

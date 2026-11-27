@@ -10,7 +10,7 @@ import { runTool, type ToolRegistrar } from "./shared.js";
 
 export const registerDocumentTools: ToolRegistrar = (server, { router }) => {
   server.registerTool("foundry_search_documents", {
-    description: "Search world documents, or a specified compendium, without loading unrelated full documents.",
+    description: "Search world documents, embedded documents of a parent (via parentUuid, e.g. Items of an Actor), or a specified compendium, without loading unrelated full documents.",
     inputSchema: FoundrySearchDocumentsInputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true }
   }, async (input) => runTool(() => router.route(BridgeOperation.SEARCH_DOCUMENTS, input, { tool: "foundry_search_documents" })));

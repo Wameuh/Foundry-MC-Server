@@ -150,12 +150,30 @@ export class DirectFoundryOperations {
     const query = typeof input["query"] === "string" ? input["query"].trim().toLocaleLowerCase() : "";
     const folderId = typeof input["folderId"] === "string" ? input["folderId"] : undefined;
     const packId = typeof input["packId"] === "string" ? input["packId"] : undefined;
+    const parentUuid = typeof input["parentUuid"] === "string" ? input["parentUuid"] : undefined;
     const limit = Math.max(1, Math.min(100, Number(input["limit"] ?? 25)));
     const offset = decodeCursor(input["cursor"]);
     const client = await this.getClient();
 
+    if (parentUuid && packId) throw new AppError("INVALID_REQUEST", "parentUuid cannot be combined with packId");
+    if (parentUuid && folderId) throw new AppError("INVALID_REQUEST", "parentUuid cannot be combined with folderId: embedded documents have no folder");
+
     let entries: { uuid: string; data: JsonRecord }[];
-    if (packId) {
+    if (parentUuid) {
+      const parent = await this.readDocumentByUuid(parentUuid);
+      if (parent.packId) {
+        throw new AppError(
+          "INVALID_REQUEST",
+          "Embedded search inside compendium documents is not supported; read the parent with includeEmbedded instead"
+        );
+      }
+      const collection = embeddedCollectionName(documentType);
+      const embedded = Array.isArray(parent.data[collection]) ? parent.data[collection] as JsonRecord[] : [];
+      entries = embedded.map((data) => ({
+        uuid: embeddedUuid(parentUuid, documentType, asString(data["_id"], "_id")),
+        data
+      }));
+    } else if (packId) {
       const response = await client.getDocuments(documentType, { pack: packId, query: {} }, { logLabel: `search pack ${packId}` });
       entries = resultDocuments(response).map((data) => ({
         uuid: compendiumUuid(packId, asString(data["_id"], "_id")),
@@ -174,7 +192,7 @@ export class DirectFoundryOperations {
     );
     const page = filtered.slice(offset, offset + limit);
     return {
-      results: page.map(({ uuid, data }) => reference(uuid, documentType, data, undefined, packId)),
+      results: page.map(({ uuid, data }) => reference(uuid, documentType, data, parentUuid, parentUuid ? undefined : packId)),
       ...(offset + limit < filtered.length ? { nextCursor: encodeCursor(offset + limit) } : {}),
       total: filtered.length
     };

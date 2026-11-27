@@ -16,6 +16,36 @@ describe("document operation schemas", () => {
     expect(value.limit).toBe(25);
   });
 
+  it("accepts parentUuid for embedded document search", () => {
+    const value = FoundrySearchDocumentsInputSchema.parse({
+      documentType: "Item",
+      query: "bite",
+      parentUuid: "Actor.couatl0000000001"
+    });
+
+    expect(value.parentUuid).toBe("Actor.couatl0000000001");
+  });
+
+  it("rejects parentUuid combined with packId", () => {
+    expect(
+      FoundrySearchDocumentsInputSchema.safeParse({
+        documentType: "Item",
+        parentUuid: "Actor.couatl0000000001",
+        packId: "dnd5e-monsters"
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects parentUuid combined with folderId", () => {
+    expect(
+      FoundrySearchDocumentsInputSchema.safeParse({
+        documentType: "Item",
+        parentUuid: "Actor.couatl0000000001",
+        folderId: "folder00000000001"
+      }).success
+    ).toBe(false);
+  });
+
   it("accepts safe document creation data", () => {
     expect(
       FoundryCreateDocumentsInputSchema.safeParse({
